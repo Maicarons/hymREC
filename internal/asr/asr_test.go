@@ -11,7 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/henyemiren/hymrec/internal/config"
+	"github.com/henyemiren/hymREC/internal/config"
 )
 
 func TestNoneEngine(t *testing.T) {
@@ -79,7 +79,7 @@ func funasrTestServer(t *testing.T, wantText string) *httptest.Server {
 
 		// 返回在线增量结果
 		resp, _ := json.Marshal(map[string]any{
-			"mode": "2pass-online", "text": wantText, "wav_name": "hymrec_live",
+			"mode": "2pass-online", "text": wantText, "wav_name": "hymREC_live",
 		})
 		if err := conn.WriteMessage(websocket.TextMessage, resp); err != nil {
 			t.Errorf("写结果失败: %v", err)
@@ -98,7 +98,7 @@ func funasrTestServer(t *testing.T, wantText string) *httptest.Server {
 		}
 		// 返回 offline 最终结果
 		final, _ := json.Marshal(map[string]any{
-			"mode": "2pass-offline", "text": "，", "wav_name": "hymrec_live", "is_final": true,
+			"mode": "2pass-offline", "text": "，", "wav_name": "hymREC_live", "is_final": true,
 		})
 		_ = conn.WriteMessage(websocket.TextMessage, final)
 	}))
@@ -114,7 +114,7 @@ func TestFunASRWSProcessAndFlush(t *testing.T) {
 		Endpoint:  wsURL,
 		Mode:      "2pass",
 		ChunkSize: []int{0, 10, 5},
-		WavName:   "hymrec_live",
+		WavName:   "hymREC_live",
 		Hotwords:  map[string]int{"星瞳": 5},
 	})
 	if err != nil {

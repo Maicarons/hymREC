@@ -1,5 +1,5 @@
 // Package config 定义恨也迷人风格录制系统的配置结构，
-// 支持 YAML 文件加载与命令行覆盖（见 cmd/hymrec/main.go）。
+// 支持 YAML 文件加载与命令行覆盖（见 cmd/hymREC/main.go）。
 package config
 
 import (
@@ -28,7 +28,7 @@ func Default() *Config {
 			Endpoint:  "ws://127.0.0.1:10095",
 			Mode:      "2pass",
 			ChunkSize: []int{0, 10, 5},
-			WavName:   "hymrec_live",
+			WavName:   "hymREC_live",
 			Hotwords:  defaultHotwords(),
 		},
 

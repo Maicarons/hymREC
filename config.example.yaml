@@ -1,4 +1,4 @@
-# hymrec 配置示例
+# hymREC 配置示例
 # 复制为 config.yaml 后按需修改；未配置的字段使用默认值。
 # 完整说明见 docs/guide/configuration.md
 
@@ -20,7 +20,7 @@ asr:
   endpoint: ws://127.0.0.1:10095  # FunASR 流式服务地址
   mode: 2pass
   chunk_size: [0, 10, 5]
-  wav_name: hymrec_live
+  wav_name: hymREC_live
   # 热词表（权重 1-5）：T1 给 5，T2 给 4，T3 给 3
   hotwords:
     星瞳: 5

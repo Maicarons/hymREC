@@ -1,9 +1,9 @@
 # 项目结构
 
 ```
-hymrec/
+hymREC/
 ├── cmd/
-│   └── hymrec/               # 主入口（flag 解析、信号处理）
+│   └── hymREC/               # 主入口（flag 解析、信号处理）
 ├── internal/
 │   ├── asr/                  # ASR 引擎接口 + None/FunASR-WS 实现
 │   ├── bili/                 # B 站直播 API（房间信息、流地址）
@@ -25,7 +25,7 @@ hymrec/
 ## 包依赖关系
 
 ```
-cmd/hymrec
+cmd/hymREC
     └── pipeline
         ├── asr
         ├── bili

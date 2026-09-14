@@ -9,13 +9,13 @@
 ## 1. 克隆与构建
 
 ```bash
-git clone https://github.com/henyemiren/hymrec.git
-cd hymrec
+git clone https://github.com/henyemiren/hymREC.git
+cd hymREC
 
 # 构建
 make build
 # 或
-go build -o hymrec ./cmd/hymrec
+go build -o hymREC ./cmd/hymREC
 ```
 
 ## 2. 准备配置文件
@@ -38,10 +38,10 @@ asr:
 
 ```bash
 # 使用配置文件
-./hymrec -c config.yaml
+./hymREC -c config.yaml
 
 # 或用命令行参数覆盖
-./hymrec -room 21452505
+./hymREC -room 21452505
 ```
 
 启动后系统会：

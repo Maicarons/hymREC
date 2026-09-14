@@ -28,7 +28,7 @@ asr:
   endpoint: ws://127.0.0.1:10095
   mode: 2pass
   chunk_size: [0, 10, 5]      # [encoder, decoder, offset]
-  wav_name: hymrec_live
+  wav_name: hymREC_live
   hotwords: { 星瞳: 5, 瞳子: 4 }
 ```
 
@@ -93,8 +93,8 @@ log_level: info               # debug | info | warn | error
 
 ## 命令行覆盖
 
-启动参数可覆盖配置文件（`hymrec -h` 查看全部）：
+启动参数可覆盖配置文件（`hymREC -h` 查看全部）：
 
 ```bash
-./hymrec -c config.yaml -room 21452505 -asr-type funasr-ws -platform web -out ./recordings
+./hymREC -c config.yaml -room 21452505 -asr-type funasr-ws -platform web -out ./recordings
 ```

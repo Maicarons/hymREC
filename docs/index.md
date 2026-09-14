@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: hymrec
+  name: hymREC
   text: 恨也迷人风格的 B 站直播关键词触发录制
   tagline: 监控直播间，命中关键词自动产出含前 90 秒上下文的视频切片
   actions:
@@ -10,7 +10,7 @@ hero:
       link: /guide/quickstart
     - theme: alt
       text: GitHub
-      link: https://github.com/henyemiren/hymrec
+      link: https://github.com/henyemiren/hymREC
 
 features:
   - icon: 🎯

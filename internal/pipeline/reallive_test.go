@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/henyemiren/hymrec/internal/bili"
-	"github.com/henyemiren/hymrec/internal/config"
+	"github.com/henyemiren/hymREC/internal/bili"
+	"github.com/henyemiren/hymREC/internal/config"
 )
 
 func TestRealLiveEndToEnd(t *testing.T) {

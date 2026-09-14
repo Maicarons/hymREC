@@ -1,6 +1,6 @@
 # ASR 接入
 
-hymrec 通过 `asr.Engine` 接口解耦语音识别实现：
+hymREC 通过 `asr.Engine` 接口解耦语音识别实现：
 
 ```go
 type Engine interface {
@@ -56,7 +56,7 @@ asr:
   endpoint: ws://127.0.0.1:10095
   mode: 2pass
   chunk_size: [0, 10, 5]
-  wav_name: hymrec_live
+  wav_name: hymREC_live
   hotwords:
     星瞳: 5
     瞳子: 4
@@ -68,7 +68,7 @@ asr:
 
 1. **文本帧**发送 JSON header：
    ```json
-   {"mode":"2pass","chunk_size":[0,10,5],"wav_name":"hymrec_live","is_speaking":true,"itn":true,"hotwords":"{\"星瞳\":5}"}
+   {"mode":"2pass","chunk_size":[0,10,5],"wav_name":"hymREC_live","is_speaking":true,"itn":true,"hotwords":"{\"星瞳\":5}"}
    ```
 2. **二进制帧**发送 PCM s16le 音频字节（16kHz 单声道）；
 3. 服务端文本帧返回 `{"mode":"2pass-online","text":"..."}`（增量）或 `{"mode":"2pass-offline","text":"...","is_final":true}`（最终）；

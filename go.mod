@@ -1,4 +1,4 @@
-module github.com/henyemiren/hymrec
+module github.com/henyemiren/hymREC
 
 go 1.25.5
 

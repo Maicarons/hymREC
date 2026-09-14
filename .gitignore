@@ -1,8 +1,9 @@
 # 构建产物
 /bin/
 *.exe
-hymrec
-hymrec.exe
+/hymREC
+/hymREC.exe
+/hymrec.log
 
 # 录制输出
 /recordings/

@@ -1,4 +1,4 @@
-# hymrec
+# hymREC
 
 恨也迷人风格的 **B 站直播关键词触发录制系统**（Go）。
 
@@ -6,7 +6,7 @@
 
 关键词策略参考虚拟主播切片人**恨也迷人**的"量大管饱也有爆点"风格：触发条件宽松、覆盖"其他主播提及相关话题"的外溢内容。
 
-> ⚠️ 仅供学习交流使用。请在征得对方许可的情况下录制，请勿用于商业用途或大规模录制。详见 [法律声明](https://henyemiren.github.io/hymrec/guide/legal.html)。
+> ⚠️ 仅供学习交流使用。请在征得对方许可的情况下录制，请勿用于商业用途或大规模录制。详见 [法律声明](https://henyemiren.github.io/hymREC/guide/legal.html)。
 
 ## ✨ 特性
 
@@ -21,12 +21,12 @@
 环境要求：Go 1.21+、[ffmpeg](https://ffmpeg.org/)（加入 PATH）。
 
 ```bash
-git clone https://github.com/henyemiren/hymrec.git
-cd hymrec
+git clone https://github.com/henyemiren/hymREC.git
+cd hymREC
 
 make build
 cp config.example.yaml config.yaml   # 修改 room_id
-./bin/hymrec -c config.yaml
+./bin/hymREC -c config.yaml
 ```
 
 输出：
@@ -73,7 +73,7 @@ cd docs && npm install && npm run dev   # http://localhost:5173
 ## 📁 项目结构
 
 ```
-cmd/hymrec          主入口
+cmd/hymREC          主入口
 internal/
   asr/              ASR 引擎（none / FunASR-WS）
   bili/             B 站直播 API
@@ -95,4 +95,4 @@ docs/               VitePress 文档
 
 ## 📄 许可证
 
-[AGPL-3.0](LICENSE) © hymrec contributors
+[AGPL-3.0](LICENSE) © hymREC contributors

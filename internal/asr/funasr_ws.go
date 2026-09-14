@@ -60,7 +60,7 @@ func NewFunASRWS(opts FunASROptions) (*FunASRWS, error) {
 		opts.ChunkSize = []int{0, 10, 5}
 	}
 	if opts.WavName == "" {
-		opts.WavName = "hymrec_live"
+		opts.WavName = "hymREC_live"
 	}
 	opts.ITN = true
 	return &FunASRWS{

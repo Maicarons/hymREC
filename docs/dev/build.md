@@ -4,7 +4,7 @@
 
 ```bash
 # 当前平台
-make build                 # 输出 ./bin/hymrec
+make build                 # 输出 ./bin/hymREC
 
 # 交叉编译（GitHub Releases 常用）
 make build-linux
@@ -15,7 +15,7 @@ make build-windows
 版本信息通过 `-ldflags` 注入：
 
 ```bash
-go build -ldflags "-X main.version=v1.0.0" -o bin/hymrec ./cmd/hymrec
+go build -ldflags "-X main.version=v1.0.0" -o bin/hymREC ./cmd/hymREC
 ```
 
 ## 文档构建
@@ -46,10 +46,10 @@ GitHub Actions（`.github/workflows/ci.yml`）：
 FROM golang:1.25 AS build
 WORKDIR /src
 COPY . .
-RUN CGO_ENABLED=0 go build -o /hymrec ./cmd/hymrec
+RUN CGO_ENABLED=0 go build -o /hymREC ./cmd/hymREC
 
 FROM alpine:3.20
 RUN apk add --no-cache ffmpeg
-COPY --from=build /hymrec /usr/local/bin/hymrec
-ENTRYPOINT ["hymrec"]
+COPY --from=build /hymREC /usr/local/bin/hymREC
+ENTRYPOINT ["hymREC"]
 ```
