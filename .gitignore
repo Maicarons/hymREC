@@ -31,3 +31,9 @@ docs/.vitepress/cache/
 *.swp
 .DS_Store
 Thumbs.db
+
+# paper 构建产物
+/paper/*.aux
+/paper/*.log
+/paper/*.out
+/paper/preview/
