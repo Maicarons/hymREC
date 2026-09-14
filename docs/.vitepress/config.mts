@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  title: 'hymrec',
+  title: 'hymREC',
   description: '恨也迷人风格的 B 站直播关键词触发录制系统',
   lang: 'zh-CN',
   cleanUrls: true,
@@ -14,7 +14,7 @@ export default defineConfig({
     nav: [
       { text: '首页', link: '/' },
       { text: '指南', link: '/guide/quickstart' },
-      { text: 'GitHub', link: 'https://github.com/henyemiren/hymrec' },
+      { text: 'GitHub', link: 'https://github.com/henyemiren/hymREC' },
     ],
     sidebar: [
       {
@@ -43,13 +43,13 @@ export default defineConfig({
     ],
     footer: {
       message: 'AGPL-3.0 License · 仅供学习交流',
-      copyright: 'Copyright © 2026 hymrec contributors',
+      copyright: 'Copyright © 2026 hymREC contributors',
     },
     editLink: {
-      pattern: 'https://github.com/henyemiren/hymrec/edit/main/docs/:path',
+      pattern: 'https://github.com/henyemiren/hymREC/edit/main/docs/:path',
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/henyemiren/hymrec' },
+      { icon: 'github', link: 'https://github.com/henyemiren/hymREC' },
     ],
   },
 })
