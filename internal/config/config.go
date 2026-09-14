@@ -246,16 +246,16 @@ func (c *Config) fillDefaults() {
 	if c.Keyword.T3CooccurWindow == 0 {
 		c.Keyword.T3CooccurWindow = d.Keyword.T3CooccurWindow
 	}
-	if len(c.Keyword.T1) == 0 {
+	if c.Keyword.T1 == nil {
 		c.Keyword.T1 = d.Keyword.T1
 	}
-	if len(c.Keyword.T2) == 0 {
+	if c.Keyword.T2 == nil {
 		c.Keyword.T2 = d.Keyword.T2
 	}
-	if len(c.Keyword.T3) == 0 {
+	if c.Keyword.T3 == nil {
 		c.Keyword.T3 = d.Keyword.T3
 	}
-	if len(c.Keyword.T4) == 0 {
+	if c.Keyword.T4 == nil {
 		c.Keyword.T4 = d.Keyword.T4
 	}
 	if c.Danmaku.DensityThreshold == 0 {
@@ -267,7 +267,7 @@ func (c *Config) fillDefaults() {
 	if c.Danmaku.ConfirmDelay == 0 {
 		c.Danmaku.ConfirmDelay = d.Danmaku.ConfirmDelay
 	}
-	if len(c.Danmaku.Keywords) == 0 {
+	if c.Danmaku.Keywords == nil {
 		c.Danmaku.Keywords = d.Danmaku.Keywords
 	}
 	if c.Recorder.OutputDir == "" {
@@ -294,7 +294,7 @@ func (c *Config) fillDefaults() {
 	if c.LogLevel == "" {
 		c.LogLevel = d.LogLevel
 	}
-	if len(c.ASR.Hotwords) == 0 {
+	if c.ASR.Hotwords == nil {
 		c.ASR.Hotwords = d.ASR.Hotwords
 	}
 }
