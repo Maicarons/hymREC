@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
@@ -31,10 +32,12 @@ type Client struct {
 	baseURL   string // 覆盖 API 域名（测试用）
 }
 
-// NewClient 创建客户端；httpClient 为空时使用默认 15 秒超时的客户端。
+// NewClient 创建客户端；httpClient 为空时使用默认 15 秒超时、共享 CookieJar 的客户端。
+// CookieJar 用于携带 buvid3 等风控 cookie（wbi 签名接口需要）。
 func NewClient(httpClient *http.Client) *Client {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 15 * time.Second}
+		jar, _ := cookiejar.New(nil)
+		httpClient = &http.Client{Timeout: 15 * time.Second, Jar: jar}
 	}
 	return &Client{http: httpClient, userAgent: UserAgent}
 }
@@ -52,13 +55,11 @@ func (c *Client) SetBaseURL(base string) { c.baseURL = base }
 
 // RoomStatus 房间状态。
 type RoomStatus struct {
-	RoomID     int    `json:"roomid"`
+	RoomID     int    `json:"room_id"`
 	ShortID    int    `json:"short_id"`
 	UID        int    `json:"uid"`
-	LiveStatus int    `json:"liveStatus"` // 0=未开播 1=直播中 2=轮播
+	LiveStatus int    `json:"live_status"` // 0=未开播 1=直播中 2=轮播
 	Title      string `json:"title"`
-	LiveTime   string `json:"live_time"`
-	Online     int    `json:"online"`
 }
 
 // apiResponse B 站 API 通用响应包装。
@@ -132,8 +133,9 @@ func (c *Client) GetRealRoomID(shortID int) (int, error) {
 }
 
 // GetRoomStatus 查询房间开播状态与标题。
+// 开播状态以 room_init 为准（字段稳定）；标题尽力从 getRoomInfoOld 获取，失败时忽略。
 func (c *Client) GetRoomStatus(roomID int) (*RoomStatus, error) {
-	r, err := c.get(c.apiURL(apiRoomInfoOld), url.Values{"mid": {fmt.Sprint(roomID)}})
+	r, err := c.get(c.apiURL(apiRoomInit), url.Values{"id": {fmt.Sprint(roomID)}})
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +144,20 @@ func (c *Client) GetRoomStatus(roomID int) (*RoomStatus, error) {
 	}
 	var st RoomStatus
 	if err := json.Unmarshal(r.Data, &st); err != nil {
-		return nil, fmt.Errorf("解析 getRoomInfoOld 响应失败: %w", err)
+		return nil, fmt.Errorf("解析 room_init 响应失败: %w", err)
+	}
+	// 标题（尽力而为，失败不影响状态判断）
+	if r2, err := c.get(c.apiURL(apiRoomInfoOld), url.Values{"mid": {fmt.Sprint(roomID)}}); err == nil {
+		var extra struct {
+			Title      string `json:"title"`
+			LiveStatus int    `json:"liveStatus"`
+		}
+		if json.Unmarshal(r2.Data, &extra) == nil {
+			st.Title = extra.Title
+			if st.LiveStatus == 0 {
+				st.LiveStatus = extra.LiveStatus
+			}
+		}
 	}
 	return &st, nil
 }

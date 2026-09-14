@@ -31,11 +31,11 @@
 3. 弹幕关键词列表（`danmaku.keywords`）是否与直播内容匹配；
 4. 密度阈值（`density_threshold`）是否过高。
 
-### Mock 模式下一切正常，换成 FunASR 后无触发
+### ASR 无识别结果
 
-1. 确认 FunASR 服务可访问（`endpoint` 地址）；
+1. 确认 FunASR 服务可访问（`endpoint` 地址），可先用浏览器/客户端连一下 ws 地址；
 2. 查看日志中是否有 ASR 错误（`level=DEBUG` 开启 debug 日志）；
-3. 确认热词表 JSON 语法（中文引号问题）——`hotwords` 在 YAML 中应为普通 map，不要手动加引号。
+3. 确认热词表在 YAML 中为普通 map，不要手动加引号。
 
 ### 录制一段时间后"音频流中断，等待重连"
 

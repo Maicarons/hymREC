@@ -23,12 +23,16 @@ func newMockAPI(t *testing.T) *mockAPI {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/room/v1/Room/room_init", func(w http.ResponseWriter, r *http.Request) {
+		status := 0
+		if m.live {
+			status = 1
+		}
 		m.write(w, map[string]any{
 			"code": 0, "message": "ok",
 			"data": map[string]any{
 				"room_id":     21452505,
 				"short_id":    m.queryInt(r, "id"),
-				"live_status": 1,
+				"live_status": status,
 			},
 		})
 	})

@@ -4,11 +4,14 @@
 
 ## 工作方式
 
-1. `danmaku.Client` 通过 WebSocket 连接 B 站弹幕服务器（`wss://broadcastlv.chat.bilibili.com/sub`）；
-2. 完成认证（`protover=3`，请求 brotli 压缩）后持续接收弹幕，每 30 秒发送心跳；
-3. 每条 `DANMU_MSG` 弹幕文本与关键词列表比对；
-4. **滑动窗口统计**：最近 `window_seconds`（默认 30 秒）内含关键词弹幕条数达到 `density_threshold`（默认 5）时触发；
-5. **延迟确认**：达标后等待 `confirm_delay`（默认 2 秒）再次确认仍达标才触发，降低误触发。
+1. `pipeline` 通过 `getDanmuInfo`（wbi 签名 + buvid3 cookie）获取房间**专属弹幕服务器地址与认证 token**；
+2. `danmaku.Client` 通过 WebSocket 连接专属弹幕服务器（`wss://<host>:<wss_port>/sub`），携带 `key` 认证；
+3. 完成认证（`protover=2`，zlib 压缩）后持续接收弹幕，每 30 秒发送心跳；
+4. 每条 `DANMU_MSG` 弹幕文本与关键词列表比对；
+5. **滑动窗口统计**：最近 `window_seconds`（默认 30 秒）内含关键词弹幕条数达到 `density_threshold`（默认 5）时触发；
+6. **延迟确认**：达标后等待 `confirm_delay`（默认 2 秒）再次确认仍达标才触发，降低误触发。
+
+> 说明：B 站已对公共弹幕服务器 `broadcastlv.chat.bilibili.com` 收紧风控，无 token 连接会被立即断开（1006）。系统会自动走 `getDanmuInfo` 获取专属服务器与 token，无需手动配置。
 
 ## 为什么弹幕有用
 
@@ -40,5 +43,16 @@ danmaku:
 
 - 16 字节包头：`packetLen(4) + headerLen(2) + version(2) + op(4) + seq(4)`；
 - 操作码：`2` 心跳、`3` 心跳回复、`5` 消息、`7` 认证、`8` 认证回复；
+- 认证：`{"uid":0,"roomid":X,"protover":2,"platform":"web","type":2,"key":"<token>"}`；
 - 压缩：`version=0` JSON 明文、`2` zlib、`3` brotli（自动解压并递归拆包）；
-- 断线自动重连（指数退避，最长 30 秒）。
+- 断线自动重连（指数退避，最长 30 秒）；
+- 握手注意事项：需携带浏览器 `User-Agent` 与 `Origin: https://live.bilibili.com`，且**不要**声明 WebSocket 子协议（B 站服务器会拒绝）。
+
+## wbi 签名
+
+`getDanmuInfo` 需要 wbi 签名（`internal/bili/wbi.go`）：
+
+1. 访问 `https://www.bilibili.com/` 获取 `buvid3` cookie（并复制到 `.bilibili.com` 公共域）；
+2. 通过主站 `nav` 接口获取 `img_key`/`sub_key`（未登录返回 -101 但 `wbi_img` 仍有效）；
+3. 按固定打乱表生成 `mixin_key`，参数排序 + 时间戳 + MD5 生成 `w_rid`；
+4. 携带 `wts`/`w_rid` 调用 `getDanmuInfo` 获取 token 与专属服务器列表。

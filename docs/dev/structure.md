@@ -5,7 +5,7 @@ hymrec/
 ├── cmd/
 │   └── hymrec/               # 主入口（flag 解析、信号处理）
 ├── internal/
-│   ├── asr/                  # ASR 引擎接口 + None/Mock/FunASR-WS 实现
+│   ├── asr/                  # ASR 引擎接口 + None/FunASR-WS 实现
 │   ├── bili/                 # B 站直播 API（房间信息、流地址）
 │   ├── capture/              # 音频采集（ffmpeg 管道 -> 16kHz PCM）
 │   ├── config/               # 配置加载与校验（YAML + 默认值）

@@ -25,30 +25,6 @@ func TestNoneEngine(t *testing.T) {
 	}
 }
 
-func TestMockEngine(t *testing.T) {
-	e := NewMock(MockOptions{
-		Texts:    []string{"星瞳", "其他"},
-		Interval: 100 * time.Millisecond,
-	})
-	defer e.Close()
-
-	// 第一块：间隔未到，无输出
-	text, _ := e.ProcessChunk(make([]int16, 9600))
-	if text != "" {
-		t.Fatalf("首块应无输出, 实际 %q", text)
-	}
-	time.Sleep(120 * time.Millisecond)
-	text, _ = e.ProcessChunk(make([]int16, 9600))
-	if text != "星瞳" {
-		t.Fatalf("第二块应输出第一段文本, 实际 %q", text)
-	}
-	time.Sleep(120 * time.Millisecond)
-	text, _ = e.ProcessChunk(make([]int16, 9600))
-	if text != "其他" {
-		t.Fatalf("第三块应轮询到第二段文本, 实际 %q", text)
-	}
-}
-
 // NewConfig 便捷构造 ASR 配置。
 func NewConfig(typ, endpoint string, chunkSize []int, wavName string, hotwords map[string]int) config.ASRConfig {
 	return config.ASRConfig{
@@ -72,7 +48,7 @@ func funasrTestServer(t *testing.T, wantText string) *httptest.Server {
 		}
 		defer conn.Close()
 
-		// 读 header（文本帧，含 hotword）
+		// 读 header（文本帧，含 hotwords）
 		msgType, header, err := conn.ReadMessage()
 		if err != nil {
 			t.Errorf("读 header 失败: %v", err)
@@ -90,8 +66,8 @@ func funasrTestServer(t *testing.T, wantText string) *httptest.Server {
 		if hdr["mode"] != "2pass" {
 			t.Errorf("mode = %v", hdr["mode"])
 		}
-		if _, ok := hdr["hotword"]; !ok {
-			t.Errorf("header 应包含 hotword")
+		if _, ok := hdr["hotwords"]; !ok {
+			t.Errorf("header 应包含 hotwords")
 		}
 
 		// 读音频二进制帧

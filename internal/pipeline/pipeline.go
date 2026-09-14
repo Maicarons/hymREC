@@ -7,6 +7,7 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"math"
@@ -138,8 +139,9 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	}
 	defer p.videoBuf.Stop()
 
-	// 4. 启动弹幕监听
+	// 4. 启动弹幕监听（先获取房间专属弹幕服务器与 token）
 	if p.dmClient != nil {
+		p.setupDanmaku(logger)
 		go func() {
 			if err := p.dmClient.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				logger.Warn("弹幕监听退出", "err", err)
@@ -281,6 +283,23 @@ func (p *Pipeline) finishRecording() {
 			p.logger.Warn("[切片完成] 未找到可用的缓冲分段", "trigger_at", sess.TriggerAt.Format("15:04:05"))
 		}
 	}
+}
+
+// setupDanmaku 获取弹幕服务器信息（token + 专属地址）并配置客户端。
+// B 站公共弹幕服务器已要求 token，须经 getDanmuInfo（wbi 签名）获取。
+func (p *Pipeline) setupDanmaku(logger *slog.Logger) {
+	if err := p.bili.EnsureBuvid3(); err != nil {
+		logger.Warn("获取 buvid3 失败（弹幕可能被风控）", "err", err)
+	}
+	info, err := p.bili.GetDanmuInfo(p.roomID)
+	if err != nil {
+		logger.Warn("获取弹幕服务器信息失败，使用公共服务器（可能被拒）", "err", err)
+		return
+	}
+	host := info.HostList[0]
+	wsURL := fmt.Sprintf("wss://%s:%d/sub", host.Host, host.WSSPort)
+	p.dmClient.SetEndpoint(wsURL, info.Token)
+	logger.Info("弹幕服务器就绪", "host", host.Host, "port", host.WSSPort)
 }
 
 // onDanmakuMessage 弹幕回调：统计关键词密度。

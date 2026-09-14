@@ -11,7 +11,7 @@ import (
 )
 
 func TestPackAuth(t *testing.T) {
-	pkt := PackAuth(21452505)
+	pkt := PackAuth(21452505, "test-token")
 	if len(pkt) < headerLen {
 		t.Fatal("认证包过短")
 	}
@@ -32,8 +32,20 @@ func TestPackAuth(t *testing.T) {
 	if body["roomid"] != float64(21452505) {
 		t.Fatalf("认证 roomid 错误: %v", body["roomid"])
 	}
-	if body["protover"] != float64(3) {
-		t.Fatalf("protover 应为 3（brotli），实际 %v", body["protover"])
+	if body["protover"] != float64(2) {
+		t.Fatalf("protover 应为 2（zlib），实际 %v", body["protover"])
+	}
+	if body["key"] != "test-token" {
+		t.Fatalf("认证 key 错误: %v", body["key"])
+	}
+	// 无 token 时不应包含 key 字段
+	pkt2 := PackAuth(21452505, "")
+	var body2 map[string]any
+	if err := json.Unmarshal(pkt2[headerLen:], &body2); err != nil {
+		t.Fatalf("认证 body 非 JSON: %v", err)
+	}
+	if _, ok := body2["key"]; ok {
+		t.Fatal("无 token 时不应包含 key 字段")
 	}
 }
 

@@ -44,7 +44,7 @@ asr:
 
 1. **文本帧**发送 JSON header：
    ```json
-   {"mode":"2pass","chunk_size":[0,10,5],"wav_name":"hymrec_live","is_speaking":true,"itn":true,"hotword":"{\"星瞳\":5}"}
+   {"mode":"2pass","chunk_size":[0,10,5],"wav_name":"hymrec_live","is_speaking":true,"itn":true,"hotwords":"{\"星瞳\":5}"}
    ```
 2. **二进制帧**发送 PCM s16le 音频字节（16kHz 单声道）；
 3. 服务端文本帧返回 `{"mode":"2pass-online","text":"..."}`（增量）或 `{"mode":"2pass-offline","text":"...","is_final":true}`（最终）；
@@ -58,15 +58,3 @@ asr:
 - T2 关联词：权重 4
 - T3 梗词：权重 3
 
-## Mock 模式
-
-无 ASR 服务时使用 `mock` 模式验证完整链路：
-
-```yaml
-asr:
-  type: mock
-  mock_texts: ["星瞳今天状态很好", "随便聊点别的"]
-  mock_interval: 8s
-```
-
-系统会按间隔轮询输出预设文本，配合默认关键词即可看到触发-录制-切片全流程。

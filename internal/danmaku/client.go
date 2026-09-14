@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
 	"time"
 
@@ -21,10 +22,12 @@ type OnMessage func(Message)
 
 // Options 弹幕客户端配置。
 type Options struct {
-	// URL 弹幕服务器地址，空时使用 DefaultURL。
+	// URL 弹幕服务器地址，空时使用 DefaultURL（公共服务器通常需要 token）。
 	URL string
 	// RoomID 真实房间号。
 	RoomID int
+	// Token getDanmuInfo 获取的认证凭证；为空时使用公共服务器（可能被拒）。
+	Token string
 	// HeartbeatInterval 心跳间隔，默认 30 秒。
 	HeartbeatInterval time.Duration
 	// Logger 日志器，可为 nil。
@@ -54,6 +57,17 @@ func New(opts Options, onMsg OnMessage) *Client {
 		opts.Logger = slog.Default()
 	}
 	return &Client{opts: opts, onMsg: onMsg, closeCh: make(chan struct{})}
+}
+
+// SetEndpoint 在启动前设置弹幕服务器地址与认证 token
+// （由调用方通过 getDanmuInfo 获取，见 internal/bili）。
+func (c *Client) SetEndpoint(url, token string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if url != "" {
+		c.opts.URL = url
+	}
+	c.opts.Token = token
 }
 
 // Run 连接弹幕服务器并持续监听，直到 ctx 取消或 Close 被调用。
@@ -90,7 +104,14 @@ func (c *Client) Run(ctx context.Context) error {
 
 // runOnce 建立一次连接并处理完整个会话。
 func (c *Client) runOnce(ctx context.Context) error {
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, c.opts.URL, nil)
+	// 浏览器 UA 与 Origin：B 站弹幕服务器会拒绝非浏览器来源。
+	// 注意：不要声明子协议（binary），B 站服务器会断开不认识的子协议握手。
+	headers := http.Header{}
+	headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	headers.Set("Origin", "https://live.bilibili.com")
+
+	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
+	conn, _, err := dialer.DialContext(ctx, c.opts.URL, headers)
 	if err != nil {
 		return fmt.Errorf("连接弹幕服务器失败: %w", err)
 	}
@@ -105,7 +126,7 @@ func (c *Client) runOnce(ctx context.Context) error {
 	}()
 
 	// 认证
-	if err := conn.WriteMessage(websocket.BinaryMessage, PackAuth(c.opts.RoomID)); err != nil {
+	if err := conn.WriteMessage(websocket.BinaryMessage, PackAuth(c.opts.RoomID, c.opts.Token)); err != nil {
 		return fmt.Errorf("发送认证包失败: %w", err)
 	}
 	c.opts.Logger.Info("弹幕服务器已连接，等待认证...", "room_id", c.opts.RoomID)

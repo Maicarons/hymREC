@@ -24,7 +24,7 @@ func Default() *Config {
 		RingBufferSeconds: 90,
 
 		ASR: ASRConfig{
-			Type:      "mock", // none | mock | funasr-ws
+			Type:      "funasr-ws", // none | funasr-ws
 			Endpoint:  "ws://127.0.0.1:10095",
 			Mode:      "2pass",
 			ChunkSize: []int{0, 10, 5},
@@ -102,7 +102,7 @@ type Config struct {
 
 // ASRConfig 语音识别引擎配置。
 type ASRConfig struct {
-	// Type 识别引擎类型：none（关闭）、mock（模拟，用于演示/测试）、funasr-ws（FunASR 流式）。
+	// Type 识别引擎类型：none（关闭，仅弹幕触发）或 funasr-ws（FunASR 流式，默认）。
 	Type string `yaml:"type"`
 	// Endpoint FunASR WebSocket 服务地址，如 ws://127.0.0.1:10095。
 	Endpoint string `yaml:"endpoint"`
@@ -114,10 +114,6 @@ type ASRConfig struct {
 	WavName string `yaml:"wav_name"`
 	// Hotwords 热词表，键为热词，值为权重（T1/T2 建议 5，T3 建议 3-4）。
 	Hotwords map[string]int `yaml:"hotwords"`
-	// MockTexts mock 模式下轮询输出的文本，用于演示触发流程。
-	MockTexts []string `yaml:"mock_texts"`
-	// MockInterval mock 模式下输出文本的间隔。
-	MockInterval time.Duration `yaml:"mock_interval"`
 }
 
 // VADConfig 静音检测配置（基于能量阈值）。
@@ -238,9 +234,6 @@ func (c *Config) fillDefaults() {
 	if len(c.ASR.ChunkSize) != 3 {
 		c.ASR.ChunkSize = d.ASR.ChunkSize
 	}
-	if c.ASR.MockInterval == 0 {
-		c.ASR.MockInterval = d.ASR.MockInterval
-	}
 	if c.Keyword.StopDelaySeconds == 0 {
 		c.Keyword.StopDelaySeconds = d.Keyword.StopDelaySeconds
 	}
@@ -301,9 +294,6 @@ func (c *Config) fillDefaults() {
 	if c.LogLevel == "" {
 		c.LogLevel = d.LogLevel
 	}
-	if len(c.ASR.MockTexts) == 0 {
-		c.ASR.MockTexts = d.ASR.MockTexts
-	}
 	if len(c.ASR.Hotwords) == 0 {
 		c.ASR.Hotwords = d.ASR.Hotwords
 	}
@@ -318,9 +308,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("platform 仅支持 web(flv) 或 h5(m3u8)，当前: %q", c.Platform)
 	}
 	switch c.ASR.Type {
-	case "none", "mock", "funasr-ws":
+	case "none", "funasr-ws":
 	default:
-		return fmt.Errorf("asr.type 仅支持 none|mock|funasr-ws，当前: %q", c.ASR.Type)
+		return fmt.Errorf("asr.type 仅支持 none|funasr-ws，当前: %q", c.ASR.Type)
 	}
 	if c.Keyword.T2Threshold <= 0 || c.Keyword.T2Threshold > 1 {
 		return fmt.Errorf("keyword.t2_threshold 必须在 (0,1] 区间")

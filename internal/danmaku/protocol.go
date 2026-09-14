@@ -48,15 +48,19 @@ func pack(op uint32, body []byte) []byte {
 	return buf
 }
 
-// PackAuth 构造认证包。
-func PackAuth(roomID int) []byte {
-	body, _ := json.Marshal(map[string]any{
+// PackAuth 构造认证包。token 为 getDanmuInfo 获取的认证凭证（可空）。
+func PackAuth(roomID int, token string) []byte {
+	payload := map[string]any{
 		"uid":      0,
 		"roomid":   roomID,
-		"protover": 3, // 请求 brotli 压缩（服务端不满足时退回 zlib）
+		"protover": 2, // zlib 压缩，兼容性最好
 		"platform": "web",
 		"type":     2,
-	})
+	}
+	if token != "" {
+		payload["key"] = token
+	}
+	body, _ := json.Marshal(payload)
 	return pack(opAuth, body)
 }
 

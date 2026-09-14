@@ -4,7 +4,7 @@
 
 - **Go 1.21+**
 - **ffmpeg**（需加入 PATH）：用于音频抽取、视频分段与切片合并
-- （可选）**FunASR 服务**：流式语音识别。没有时可用 `mock` 模式跑通演示流程
+- **FunASR 服务**：流式语音识别服务（推荐，见 [ASR 接入](./asr)）
 
 ## 1. 克隆与构建
 
@@ -29,7 +29,7 @@ cp config.example.yaml config.yaml
 ```yaml
 room_id: 21452505        # 目标直播间号（支持短号）
 asr:
-  type: mock             # 无 FunASR 时先用 mock 演示；接入后改为 funasr-ws
+  type: funasr-ws        # none（仅弹幕）| funasr-ws（真实 FunASR）
 ```
 
 完整配置项见 [配置说明](./configuration)。
@@ -41,7 +41,7 @@ asr:
 ./hymrec -c config.yaml
 
 # 或用命令行参数覆盖
-./hymrec -room 21452505 -asr-type mock
+./hymrec -room 21452505
 ```
 
 启动后系统会：

@@ -30,7 +30,7 @@ type FunASROptions struct {
 // FunASRWS 对接 FunASR runtime WebSocket 服务的流式客户端。
 //
 // 协议（funasr/runtime/python/websocket/funasr_wss_client.py）：
-//  1. 文本帧发送 JSON header：{"mode":"2pass","chunk_size":[...],"wav_name":...,"is_speaking":true,"itn":true,"hotword":"{...}"}
+//  1. 文本帧发送 JSON header：{"mode":"2pass","chunk_size":[...],"wav_name":...,"is_speaking":true,"itn":true,"hotwords":"{...}"}
 //  2. 二进制帧发送 PCM s16le 音频字节
 //  3. 服务端文本帧返回：{"mode":"2pass-online","text":...} 或 {"mode":"2pass-offline","text":...}
 //  4. 结束：发送 {"mode":"2pass","wav_name":...,"is_speaking":false}，等待 offline 最终结果
@@ -82,7 +82,7 @@ func (f *FunASRWS) header(isSpeaking bool) ([]byte, error) {
 		"wav_name":    f.opts.WavName,
 		"is_speaking": isSpeaking,
 		"itn":         f.opts.ITN,
-		"hotword":     string(hotword),
+		"hotwords":    string(hotword), // 官方服务端字段为复数形式
 	}
 	return json.Marshal(payload)
 }
@@ -95,7 +95,8 @@ func (f *FunASRWS) ensureConnected() error {
 		return nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, f.opts.Endpoint, nil)
+	dialer := websocket.Dialer{Subprotocols: []string{"binary"}} // 服务端声明 subprotocol=binary
+	conn, _, err := dialer.DialContext(ctx, f.opts.Endpoint, nil)
 	if err != nil {
 		cancel()
 		return fmt.Errorf("连接 FunASR 服务失败: %w", err)

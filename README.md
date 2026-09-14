@@ -13,7 +13,7 @@
 - **层级关键词引擎**：T1 精确 / T2 模糊（相似度阈值）/ T3 梗词联合 / T4 否定屏蔽
 - **视频回溯切片**：ffmpeg 按 10 秒分段持续缓冲，触发时回溯前 90 秒并 concat 合并输出 TS/MP4
 - **弹幕辅助触发**：WebSocket 实时监听弹幕密度（30 秒窗口 ≥ 5 条触发，延迟确认防误触）
-- **流式 ASR**：内置 FunASR WebSocket 客户端与热词注入；`mock` 模式无需 ASR 即可跑通演示
+- **流式 ASR**：内置 FunASR WebSocket 客户端与热词注入，识别命中关键词即触发
 - **断线自愈**：视频缓冲与音频采集自动重连；弹幕指数退避重连
 
 ## 🚀 快速开始
@@ -27,16 +27,6 @@ cd hymrec
 make build
 cp config.example.yaml config.yaml   # 修改 room_id
 ./bin/hymrec -c config.yaml
-```
-
-无 FunASR 服务时使用 mock 模式演示完整链路：
-
-```yaml
-# config.yaml
-asr:
-  type: mock
-  mock_texts: ["星瞳今天状态很好", "随便聊点别的"]
-  mock_interval: 8s
 ```
 
 输出：
@@ -85,7 +75,7 @@ cd docs && npm install && npm run dev   # http://localhost:5173
 ```
 cmd/hymrec          主入口
 internal/
-  asr/              ASR 引擎（none / mock / FunASR-WS）
+  asr/              ASR 引擎（none / FunASR-WS）
   bili/             B 站直播 API
   capture/          音频采集（ffmpeg 管道）
   config/           配置加载

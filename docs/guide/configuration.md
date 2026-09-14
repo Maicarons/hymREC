@@ -24,21 +24,18 @@ ring_buffer_seconds: 90       # 音频环形缓冲回溯时长（秒），也是
 
 ```yaml
 asr:
-  type: funasr-ws             # none | mock | funasr-ws
+  type: funasr-ws             # none（仅弹幕）| funasr-ws（真实 FunASR）
   endpoint: ws://127.0.0.1:10095
   mode: 2pass
   chunk_size: [0, 10, 5]      # [encoder, decoder, offset]
   wav_name: hymrec_live
   hotwords: { 星瞳: 5, 瞳子: 4 }
-  mock_texts: ["星瞳今天状态很好", "随便聊点别的"]   # mock 模式轮询输出
-  mock_interval: 8s
 ```
 
 | 类型 | 说明 |
 |------|------|
 | `none` | 关闭语音识别，仅依赖弹幕触发 |
-| `mock` | 模拟 ASR，按固定间隔输出预设文本，用于演示与测试 |
-| `funasr-ws` | 对接 FunASR 流式服务（推荐，见 [ASR 接入](./asr)） |
+| `funasr-ws` | 对接 FunASR 流式服务（默认，见 [ASR 接入](./asr)） |
 
 ## VAD 静音检测
 
@@ -99,5 +96,5 @@ log_level: info               # debug | info | warn | error
 启动参数可覆盖配置文件（`hymrec -h` 查看全部）：
 
 ```bash
-./hymrec -c config.yaml -room 21452505 -asr-type mock -platform web -out ./recordings
+./hymrec -c config.yaml -room 21452505 -asr-type funasr-ws -platform web -out ./recordings
 ```

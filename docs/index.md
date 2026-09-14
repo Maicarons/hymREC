@@ -24,5 +24,5 @@ features:
     details: 实时监听弹幕密度，弥补 ASR 漏识别；弹幕往往比语音早 1-3 秒反应
   - icon: 🗣️
     title: 流式 ASR
-    details: 内置 FunASR WebSocket 客户端与热词注入，也支持 Mock 模式演示与测试
+    details: 内置 FunASR WebSocket 客户端与热词注入，识别命中关键词即触发录制
 ---
