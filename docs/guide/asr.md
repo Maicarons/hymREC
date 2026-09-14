@@ -14,15 +14,39 @@ type Engine interface {
 
 ### 1. 部署 FunASR
 
-使用官方 [FunASR runtime](https://github.com/modelscope/FunASR) 部署流式服务（Paraformer-zh-streaming）：
+**方式 A：pip 本地部署**（Windows/Linux 通用，CPU 可跑，已实测）
 
 ```bash
-# 示例（以官方镜像为准）
+python -m venv funasr-env
+funasr-env/Scripts/pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+funasr-env/Scripts/pip install funasr modelscope
+
+# 下载模型（2pass 需要：seaco 离线 + streaming 在线 + VAD + 标点）
+funasr-env/Scripts/python -c "from modelscope.hub.snapshot_download import snapshot_download; \
+  [snapshot_download(m) for m in ['iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch', \
+  'iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online', \
+  'iic/speech_fsmn_vad_zh-cn-16k-common-pytorch', \
+  'iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch']]"
+
+# 下载官方 wss 服务端并适配 funasr 1.4（模型别名、禁用声纹、hotwords 字段）
+# https://github.com/modelscope/FunASR/blob/main/runtime/python/websocket/funasr_wss_server.py
+# 模型名改用 alias：paraformer-zh / paraformer-zh-streaming / fsmn-vad / ct-punc-c
+
+funasr-env/Scripts/python funasr_wss_server.py --host 127.0.0.1 --port 10095 \
+  --device cpu --ngpu 0 --certfile ""
+```
+
+**方式 B：官方 Docker**
+
+```bash
+# 以官方镜像为准
 docker run -it --name funasr -p 10095:10095 \
   registry.cn-hangzhou.aliyuncs.com/modelscope-repo/modelscope:ubuntu20.04 \
   bash -c "cd /workspace/FunASR/runtime && \
   python funasr_wss_server.py --port 10095 --model-dir pretrained_models/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
 ```
+
+> 注意：funasr 1.4 的 `AutoModel` 仅识别注册表内的模型别名（`paraformer-zh` = seaco 热词增强版、`paraformer-zh-streaming` 等），需按方式 A 中的说明适配官方脚本。
 
 ### 2. 配置
 
