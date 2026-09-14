@@ -42,6 +42,10 @@ func New(opts Options) (*Source, error) {
 	return &Source{opts: opts}, nil
 }
 
+// biliHeaders ffmpeg -headers 参数：B 站 CDN 部分节点校验 Referer/UA。
+const biliHeaders = "Referer: https://live.bilibili.com/\r\n" +
+	"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36\r\n"
+
 // ffmpegArgs 构造 ffmpeg 命令。
 // -reconnect 系列参数让 ffmpeg 在拉流中断时自动重连（对 HTTP-FLV/HLS 生效）。
 func (s *Source) ffmpegArgs() []string {
@@ -51,6 +55,7 @@ func (s *Source) ffmpegArgs() []string {
 		"-reconnect", "1",
 		"-reconnect_streamed", "1",
 		"-reconnect_delay_max", "10",
+		"-headers", biliHeaders,
 		"-i", s.opts.StreamURL,
 		"-vn", // 丢弃视频
 		"-acodec", "pcm_s16le",

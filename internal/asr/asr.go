@@ -41,4 +41,3 @@ type noneEngine struct{}
 func (e *noneEngine) ProcessChunk(pcm []int16) (string, error) { return "", nil }
 func (e *noneEngine) Flush() (string, error)                   { return "", nil }
 func (e *noneEngine) Close() error                             { return nil }
-

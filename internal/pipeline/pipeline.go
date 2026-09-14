@@ -172,9 +172,10 @@ func (p *Pipeline) waitForLive(ctx context.Context) error {
 		st, err := p.bili.GetRoomStatus(p.cfg.RoomID)
 		if err != nil {
 			logger.Warn("查询开播状态失败", "err", err)
-		} else if st.LiveStatus == 1 {
+		} else if st.LiveStatus == 1 || st.LiveStatus == 2 {
+			// 1=直播中，2=轮播（回放/投稿循环，同样有流可录）
 			p.roomID = st.RoomID
-			logger.Info("检测到开播", "room_id", st.RoomID, "title", st.Title)
+			logger.Info("检测到直播流", "room_id", st.RoomID, "title", st.Title, "live_status", st.LiveStatus)
 			return nil
 		} else {
 			logger.Info("尚未开播，等待中", "room_id", p.cfg.RoomID, "interval", interval)

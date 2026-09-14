@@ -59,6 +59,7 @@ func NewVideoBuffer(cfg VideoBufferConfig) (*VideoBuffer, error) {
 // segmentArgs 构造 ffmpeg 分段录制命令。
 // 文件名形如 seg_20260914_123000.ts（本地时间，秒级），
 // 用于按时间回溯。注意避免使用 %s（Windows 上不可用）。
+// 携带 B 站 Referer/UA 头，兼容校验头的 CDN 节点。
 func (v *VideoBuffer) segmentArgs(streamURL string) []string {
 	pattern := filepath.Join(v.cfg.Dir, "seg_%Y%m%d_%H%M%S.ts")
 	return []string{
@@ -67,6 +68,7 @@ func (v *VideoBuffer) segmentArgs(streamURL string) []string {
 		"-reconnect", "1",
 		"-reconnect_streamed", "1",
 		"-reconnect_delay_max", "10",
+		"-headers", "Referer: https://live.bilibili.com/\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36\r\n",
 		"-i", streamURL,
 		"-c", "copy", // 不转码
 		"-f", "segment",
