@@ -11,7 +11,7 @@
 5. **滑动窗口统计**：最近 `window_seconds`（默认 30 秒）内含关键词弹幕条数达到 `density_threshold`（默认 5）时触发；
 6. **延迟确认**：达标后等待 `confirm_delay`（默认 2 秒）再次确认仍达标才触发，降低误触发。
 
-> 说明：B 站已对公共弹幕服务器 `broadcastlv.chat.bilibili.com` 收紧风控，无 token 连接会被立即断开（1006）。系统会自动走 `getDanmuInfo` 获取专属服务器与 token，无需手动配置。
+> 说明：B 站公共弹幕服务器 `broadcastlv.chat.bilibili.com` 要求携带 token，无 token 连接会被立即断开（1006）。系统会自动走 `getDanmuInfo` 获取专属服务器与 token，无需手动配置。
 
 ## 为什么弹幕有用
 

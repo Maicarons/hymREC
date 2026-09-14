@@ -290,11 +290,11 @@ func (p *Pipeline) finishRecording() {
 // B 站公共弹幕服务器已要求 token，须经 getDanmuInfo（wbi 签名）获取。
 func (p *Pipeline) setupDanmaku(logger *slog.Logger) {
 	if err := p.bili.EnsureBuvid3(); err != nil {
-		logger.Warn("获取 buvid3 失败（弹幕可能被风控）", "err", err)
+		logger.Warn("获取 buvid3 失败（弹幕连接可能受影响）", "err", err)
 	}
 	info, err := p.bili.GetDanmuInfo(p.roomID)
 	if err != nil {
-		logger.Warn("获取弹幕服务器信息失败，使用公共服务器（可能被拒）", "err", err)
+		logger.Warn("获取弹幕服务器信息失败，使用公共服务器（可能连接失败）", "err", err)
 		return
 	}
 	host := info.HostList[0]

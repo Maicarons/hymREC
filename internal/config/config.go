@@ -1,4 +1,4 @@
-// Package config 定义恨也迷人风格录制系统的配置结构，
+// Package config 定义关键词触发录制系统的配置结构，
 // 支持 YAML 文件加载与命令行覆盖（见 cmd/hymREC/main.go）。
 package config
 
@@ -87,7 +87,7 @@ type Config struct {
 	SampleRate int `yaml:"sample_rate"`
 	// ChunkMS 每个音频块时长（毫秒），默认 600。
 	ChunkMS int `yaml:"chunk_ms"`
-	// RingBufferSeconds 音频环形缓冲回溯时长（秒），恨也迷人风格为 90 秒。
+	// RingBufferSeconds 音频环形缓冲回溯时长（秒），默认 90 秒。
 	RingBufferSeconds int `yaml:"ring_buffer_seconds"`
 
 	ASR      ASRConfig      `yaml:"asr"`

@@ -26,7 +26,7 @@ type Options struct {
 	URL string
 	// RoomID 真实房间号。
 	RoomID int
-	// Token getDanmuInfo 获取的认证凭证；为空时使用公共服务器（可能被拒）。
+	// Token getDanmuInfo 获取的认证凭证；为空时使用公共服务器（可能连接失败）。
 	Token string
 	// HeartbeatInterval 心跳间隔，默认 30 秒。
 	HeartbeatInterval time.Duration

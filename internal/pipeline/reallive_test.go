@@ -3,7 +3,7 @@
 // 真实直播端到端测试：连接真实 B 站直播间、真实弹幕服务器与真实 FunASR 服务，
 // 验证"真实内容 -> 识别/弹幕触发 -> 回溯 -> 切片输出"全链路。
 //
-// 关键词使用 plan.md 的恨也迷人关键词（星瞳系列），因此目标直播间应为
+// 关键词使用 plan.md 的层级关键词（星瞳系列），因此目标直播间应为
 // 星瞳本人（22886883）或相关主播的直播间，需正在直播才能触发。
 //
 // 运行要求（缺一不可，缺失时测试明确报错）：
@@ -48,7 +48,7 @@ func TestRealLiveEndToEnd(t *testing.T) {
 	}
 	t.Logf("直播间: %d title=%q live_status=%d", roomID, st.Title, st.LiveStatus)
 
-	// 2. plan.md 的恨也迷人关键词（T1-T4 层级）+ 快速节奏配置
+	// 2. plan.md 的层级关键词（T1-T4）+ 快速节奏配置
 	cfg := config.Default()
 	cfg.RoomID = roomID
 	cfg.LiveCheckInterval = 10 * time.Second

@@ -1,4 +1,4 @@
-// hymREC 是"恨也迷人风格"的 B 站直播关键词触发录制系统。
+// hymREC 是面向虚拟主播直播切片场景的关键词触发录制系统。
 //
 // 监控目标直播间，将直播流持续分段缓冲；当 ASR 识别文本命中关键词
 // （或弹幕密度达标）时，自动产出包含关键词前 90 秒上下文的视频切片。
@@ -60,7 +60,7 @@ func main() {
 	}
 
 	logger := newLogger(cfg.LogLevel)
-	logger.Info("恨也迷人风格录制系统启动",
+	logger.Info("关键词触发录制系统启动",
 		"version", version,
 		"room_id", cfg.RoomID,
 		"platform", cfg.Platform,

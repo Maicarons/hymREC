@@ -2,7 +2,7 @@
 layout: home
 hero:
   name: hymREC
-  text: 恨也迷人风格的 B 站直播关键词触发录制
+  text: 面向虚拟主播直播切片的关键词触发录制
   tagline: 监控直播间，命中关键词自动产出含前 90 秒上下文的视频切片
   actions:
     - theme: brand

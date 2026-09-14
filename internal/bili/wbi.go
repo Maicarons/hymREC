@@ -140,7 +140,7 @@ func (c *Client) GetDanmuInfo(roomID int) (*DanmakuServerInfo, error) {
 	return &info, nil
 }
 
-// EnsureBuvid3 访问 B 站首页获取 buvid3 等风控 cookie。
+// EnsureBuvid3 访问 B 站首页获取 buvid3 等访问凭证 cookie。
 // buvid3 的 Set-Cookie 域为 www.bilibili.com，这里同时复制到
 // .bilibili.com 公共域，使 api.bilibili.com / api.live.bilibili.com 均能携带。
 func (c *Client) EnsureBuvid3() error {

@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// UserAgent 模拟移动端浏览器 UA（B 站对默认 Go UA 可能返回风控响应）。
+// UserAgent 模拟移动端浏览器 UA（B 站对默认 UA 可能返回异常响应）。
 const UserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1"
 
 const apiHost = "https://api.live.bilibili.com"
@@ -33,7 +33,7 @@ type Client struct {
 }
 
 // NewClient 创建客户端；httpClient 为空时使用默认 15 秒超时、共享 CookieJar 的客户端。
-// CookieJar 用于携带 buvid3 等风控 cookie（wbi 签名接口需要）。
+// CookieJar 用于携带 buvid3 等访问凭证 cookie（wbi 签名接口需要）。
 func NewClient(httpClient *http.Client) *Client {
 	if httpClient == nil {
 		jar, _ := cookiejar.New(nil)

@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'hymREC',
-  description: '恨也迷人风格的 B 站直播关键词触发录制系统',
+  description: '面向虚拟主播直播切片的关键词触发录制系统',
   lang: 'zh-CN',
   cleanUrls: true,
   lastUpdated: true,

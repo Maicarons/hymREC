@@ -31,7 +31,7 @@ type ControllerConfig struct {
 	OutputDir string
 	// FilenamePrefix 输出文件名前缀。
 	FilenamePrefix string
-	// PreRollSeconds 触发前回溯时长（秒），恨也迷人风格为 90。
+	// PreRollSeconds 触发前回溯时长（秒），默认 90。
 	PreRollSeconds int
 	// MergeFormat 合并输出格式：ts 或 mp4。
 	MergeFormat string

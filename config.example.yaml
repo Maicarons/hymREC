@@ -12,7 +12,7 @@ stream_retry_delay: 5s         # 流中断后的重连等待时间
 # ============ 音频与缓冲 ============
 sample_rate: 16000             # ASR 采样率（Hz）
 chunk_ms: 600                  # 每个音频块时长（毫秒）
-ring_buffer_seconds: 90        # 回溯窗口（秒），恨也迷人风格 90s
+ring_buffer_seconds: 90        # 回溯窗口（秒），默认 90s
 
 # ============ ASR ============
 asr:
