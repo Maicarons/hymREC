@@ -1,0 +1,77 @@
+# hymrec 配置示例
+# 复制为 config.yaml 后按需修改；未配置的字段使用默认值。
+# 完整说明见 docs/guide/configuration.md
+
+# ============ B 站直播 ============
+room_id: 21452505              # 目标直播间号（支持短号）
+live_check_interval: 60s       # 开播检测轮询间隔
+quality: 10000                 # 画质：10000 = 原画
+platform: web                  # web 返回 FLV（直写录制）；h5 返回 m3u8
+stream_retry_delay: 5s         # 流中断后的重连等待时间
+
+# ============ 音频与缓冲 ============
+sample_rate: 16000             # ASR 采样率（Hz）
+chunk_ms: 600                  # 每个音频块时长（毫秒）
+ring_buffer_seconds: 90        # 回溯窗口（秒），恨也迷人风格 90s
+
+# ============ ASR ============
+asr:
+  type: mock                   # none | mock | funasr-ws
+  endpoint: ws://127.0.0.1:10095  # funasr-ws 时必填
+  mode: 2pass
+  chunk_size: [0, 10, 5]
+  wav_name: hymrec_live
+  # 热词表（权重 1-5）：T1 给 5，T2 给 4，T3 给 3
+  hotwords:
+    星瞳: 5
+    小星星: 5
+    瞳子: 4
+    瞳宝: 4
+    星瞳酱: 4
+    腾讯大小姐: 3
+    CDD: 3
+    虚无: 3
+    云之彼端: 3
+    深月的风吟鸟唱: 3
+    邻家女孩: 3
+    瞳工: 3
+  # mock 模式参数（演示/测试用）
+  mock_texts: ["星瞳今天状态很好", "随便聊点别的"]
+  mock_interval: 8s
+
+# ============ VAD 静音检测 ============
+vad:
+  enabled: true
+  energy_threshold: 500.0      # RMS 能量阈值
+
+# ============ 关键词（T1-T4 层级） ============
+keyword:
+  stop_delay_seconds: 120      # 关键词消失 N 秒后停止录制
+  cooldown_seconds: 5          # 停止后冷却时间
+  t2_threshold: 0.75           # T2 模糊匹配相似度阈值
+  t3_cooccur_window: 30.0      # T3 与 T1/T2 联合触发窗口（秒）
+  t1: ["星瞳", "XingTong", "XT"]
+  t2: ["小星星", "瞳子", "瞳宝", "星瞳酱"]
+  t3: ["腾讯大小姐", "CDD", "虚无", "云之彼端", "深月的风吟鸟唱", "邻家女孩", "瞳工"]
+  t4: ["不是星瞳", "星瞳的黑称"]
+
+# ============ 弹幕辅助触发 ============
+danmaku:
+  enabled: true
+  keywords: ["星瞳", "瞳", "XT", "小星星"]
+  density_threshold: 5         # 窗口内含关键词弹幕条数达标即触发
+  window_seconds: 30
+  confirm_delay: 2s            # 延迟确认，防误触
+
+# ============ 录制输出 ============
+recorder:
+  output_dir: ./recordings
+  video_buffer_dir: ./video_buffer
+  video_keep_minutes: 5        # 缓冲保留时长（分钟）
+  video_segment_seconds: 10    # TS 分段时长（秒）
+  merge_format: ts             # ts 直接合并；mp4 需 ffmpeg 转封装
+  filename_prefix: hym_clip
+  ffmpeg_path: ffmpeg
+
+# ============ 日志 ============
+log_level: info                # debug | info | warn | error
