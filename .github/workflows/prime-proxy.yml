@@ -1,0 +1,20 @@
+name: Prime Go module proxy
+
+on:
+  push:
+    paths:
+      - ".github/workflows/prime-proxy.yml"
+
+jobs:
+  prime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request versions from proxy.golang.org
+        run: |
+          for v in v1.0.0 v1.0.1; do
+            for ext in info mod zip; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 \
+                "https://proxy.golang.org/github.com/!maicarons/hym!r!e!c/@v/${v}.${ext}")
+              echo "${v}.${ext} -> ${code}"
+            done
+          done
