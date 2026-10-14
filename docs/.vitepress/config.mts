@@ -35,6 +35,12 @@ export default defineConfig({
         ],
       },
       {
+        text: '资源',
+        items: [
+          { text: '论文', link: '/paper' },
+        ],
+      },
+      {
         text: '开发',
         items: [
           { text: '项目结构', link: '/dev/structure' },
