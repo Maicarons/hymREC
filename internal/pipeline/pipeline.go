@@ -24,6 +24,12 @@ import (
 	"github.com/Maicarons/hymREC/internal/ringbuf"
 )
 
+// stopCheckInterval 停止判定的检查间隔。
+//
+// 停止判定不依赖 ASR 出字：主播长时间沉默（VAD 判静音或识别为空）时，
+// 若仅在 Feed 内部判定超时，录制将无法结束。
+const stopCheckInterval = 5 * time.Second
+
 // Pipeline 主流水线。
 type Pipeline struct {
 	cfg    *config.Config
@@ -208,6 +214,10 @@ func (p *Pipeline) captureLoop(ctx context.Context) error {
 	cleanupTicker := time.NewTicker(30 * time.Second)
 	defer cleanupTicker.Stop()
 
+	// 停止判定与 ASR 出字解耦：静音/空识别时也能按时收尾。
+	stopCheckTicker := time.NewTicker(stopCheckInterval)
+	defer stopCheckTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -215,6 +225,10 @@ func (p *Pipeline) captureLoop(ctx context.Context) error {
 			return nil
 		case <-cleanupTicker.C:
 			p.videoBuf.Cleanup()
+		case <-stopCheckTicker.C:
+			if p.detector.Tick(time.Now()) {
+				p.finishRecording()
+			}
 		default:
 		}
 
@@ -310,7 +324,15 @@ func (p *Pipeline) onDanmakuMessage(msg danmaku.Message) {
 		return
 	}
 	now := time.Now()
-	if !p.dmDensity.feed(text, now) {
+	counted, dense := p.dmDensity.countHit(text, now)
+	if !counted {
+		return
+	}
+	// 录制进行中：命中关键词的弹幕视为持续触发，刷新停止倒计时。
+	if p.recorder.State() == recorder.StateRecording {
+		p.detector.Touch(now)
+	}
+	if !dense {
 		return
 	}
 	// 弹幕密度达标：延迟确认后触发，避免误触发
@@ -322,7 +344,10 @@ func (p *Pipeline) onDanmakuMessage(msg danmaku.Message) {
 		time.Sleep(delay)
 		if p.dmDensity.stillDense(now) && p.recorder.State() == recorder.StateIdle {
 			p.logger.Info("[触发] 弹幕密度达标", "window_seconds", p.cfg.Danmaku.WindowSeconds)
-			p.recorder.OnTrigger(time.Now(), "danmaku")
+			at := time.Now()
+			p.recorder.OnTrigger(at, "danmaku")
+			// 弹幕触发的会话同样纳入统一的停止延迟判定
+			p.detector.Touch(at)
 		}
 	}()
 }
@@ -365,18 +390,11 @@ func newDensityCounter(windowSeconds, threshold int) *densityCounter {
 	}
 }
 
-// feed 计入一条弹幕，返回当前窗口是否达标（达标后窗口计数清零，避免反复触发）。
-func (d *densityCounter) feed(text string, at time.Time) bool {
-	keywords := d.keywords
-	hit := false
-	for _, kw := range keywords {
-		if containsRune(text, kw) {
-			hit = true
-			break
-		}
-	}
-	if !hit {
-		return false
+// countHit 计入一条弹幕，返回（是否命中关键词并计入窗口, 当前窗口是否达标）。
+// 达标后窗口计数清零，避免反复触发。
+func (d *densityCounter) countHit(text string, at time.Time) (counted, dense bool) {
+	if !d.matchKeyword(text) {
+		return false, false
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -384,7 +402,17 @@ func (d *densityCounter) feed(text string, at time.Time) bool {
 	d.trimLocked(at)
 	if len(d.hits) >= d.threshold {
 		d.hits = nil
-		return true
+		return true, true
+	}
+	return true, false
+}
+
+// matchKeyword 判断弹幕是否包含配置的关键词。
+func (d *densityCounter) matchKeyword(text string) bool {
+	for _, kw := range d.keywords {
+		if containsRune(text, kw) {
+			return true
+		}
 	}
 	return false
 }

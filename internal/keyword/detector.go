@@ -9,6 +9,7 @@ package keyword
 
 import (
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -63,7 +64,11 @@ type Options struct {
 }
 
 // Detector 层级关键词检测器。
+//
+// 并发约定：Feed 来自音频采集循环，Touch 来自弹幕回调 goroutine，
+// Tick 来自停止判定定时器，故所有状态访问均由 mu 保护。
 type Detector struct {
+	mu   sync.Mutex
 	opts Options
 
 	buffer      []rune
@@ -97,6 +102,9 @@ func New(opts Options) *Detector {
 // Feed 输入一段增量识别文本，返回 (是否触发录制, 是否应停止录制)。
 // at 为文本对应的墙钟时间戳。
 func (d *Detector) Feed(text string, at time.Time) (triggered, shouldStop bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	if text != "" {
 		d.buffer = append(d.buffer, []rune(text)...)
 		if len(d.buffer) > d.opts.MaxBuffer {
@@ -129,20 +137,59 @@ func (d *Detector) Feed(text string, at time.Time) (triggered, shouldStop bool) 
 		}
 	}
 
-	if d.isActive && !d.lastHitTime.IsZero() {
-		if at.Sub(d.lastHitTime) >= d.opts.StopDelay {
-			d.isActive = false
-			return false, true
-		}
+	return false, d.tickLocked(at)
+}
+
+// Tick 执行停止超时判定，语义与 Feed 内的判定一致。
+//
+// 供 ASR 无输出时（VAD 判静音、识别结果为空、ASR 关闭）由调用方按固定
+// 间隔驱动：停止判定若只依赖 Feed，主播长时间沉默时录制将无法结束。
+// 非激活态返回 false；超时则转为非激活态并返回 true。
+func (d *Detector) Tick(at time.Time) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.tickLocked(at)
+}
+
+// tickLocked 为 Tick 的无锁实现，调用方需持有 mu。
+func (d *Detector) tickLocked(at time.Time) bool {
+	if !d.isActive || d.lastHitTime.IsZero() {
+		return false
 	}
-	return false, false
+	if at.Sub(d.lastHitTime) >= d.opts.StopDelay {
+		d.isActive = false
+		return true
+	}
+	return false
+}
+
+// Touch 记录一次非 ASR 触发源的活跃事件（如弹幕命中关键词），刷新停止倒计时，
+// 使弹幕触发的录制同样受 StopDelay 约束：持续有相关弹幕则继续录制，
+// 静默超过停止延迟后由 Tick 结束。
+//
+// 仅应在录制会话进行中调用：非激活态下调用会占用激活态，抑制后续 ASR 触发。
+func (d *Detector) Touch(at time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.lastHitTime = at
+	if !d.isActive {
+		d.isActive = true
+		d.hasHitEver = true
+		d.lastTrigger = at
+	}
 }
 
 // IsActive 返回当前是否处于录制激活状态。
-func (d *Detector) IsActive() bool { return d.isActive }
+func (d *Detector) IsActive() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.isActive
+}
 
 // Reset 清空内部状态（切换直播间时使用）。
 func (d *Detector) Reset() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.buffer = nil
 	d.recentT1T2 = nil
 	d.lastHitTime = time.Time{}

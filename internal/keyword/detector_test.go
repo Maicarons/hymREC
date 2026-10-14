@@ -214,6 +214,84 @@ func TestActiveContinuesOnHits(t *testing.T) {
 	}
 }
 
+// TestTickStopsWithoutFeed 验证 ASR 无输出（静音/空识别）时，
+// 仅靠 Tick 也能到达停止延迟并结束录制。
+func TestTickStopsWithoutFeed(t *testing.T) {
+	opts := testOptions()
+	opts.StopDelay = 10 * time.Second
+	d := New(opts)
+	now := time.Now()
+	d.Feed("星瞳", now)
+	if !d.IsActive() {
+		t.Fatal("应处于激活状态")
+	}
+	// 不再喂任何文本，仅由定时器推进
+	if d.Tick(now.Add(5 * time.Second)) {
+		t.Fatal("未到停止延迟不应停止")
+	}
+	if !d.IsActive() {
+		t.Fatal("未到停止延迟应保持激活")
+	}
+	if !d.Tick(now.Add(10 * time.Second)) {
+		t.Fatal("到达停止延迟应返回停止")
+	}
+	if d.IsActive() {
+		t.Fatal("停止后不应处于激活状态")
+	}
+	// 停止判定只需触发一次
+	if d.Tick(now.Add(20 * time.Second)) {
+		t.Fatal("已停止后不应重复返回停止")
+	}
+}
+
+// TestTickRefreshedByHits 验证录制期间再次命中会刷新倒计时，Tick 不再停止。
+func TestTickRefreshedByHits(t *testing.T) {
+	opts := testOptions()
+	opts.StopDelay = 10 * time.Second
+	d := New(opts)
+	now := time.Now()
+	d.Feed("星瞳", now)
+	// 录制中每隔 8 秒命中一次，Tick 每 9 秒检查一次，均不应停止
+	for i := 1; i <= 3; i++ {
+		at := now.Add(time.Duration(i) * 8 * time.Second)
+		d.Feed("星瞳", at)
+		if d.Tick(at.Add(time.Second)) {
+			t.Fatalf("第 %d 轮：关键词仍在出现，不应停止", i)
+		}
+	}
+}
+
+// TestTouchActivatesForDanmaku 验证弹幕触发的会话同样受停止延迟约束，
+// 且激活后不重复触发（录制已在进行）。
+func TestTouchActivatesForDanmaku(t *testing.T) {
+	opts := testOptions()
+	opts.StopDelay = 10 * time.Second
+	d := New(opts)
+	now := time.Now()
+	// 弹幕密度达标触发录制：检测器未经过 Feed，由 Touch 激活
+	d.Touch(now)
+	if !d.IsActive() {
+		t.Fatal("Touch 后应处于激活状态")
+	}
+	if d.Tick(now.Add(5 * time.Second)) {
+		t.Fatal("未到停止延迟不应停止")
+	}
+	// 持续有命中关键词的弹幕：倒计时不断刷新
+	d.Touch(now.Add(8 * time.Second))
+	if d.Tick(now.Add(15 * time.Second)) {
+		t.Fatal("弹幕持续触发期间不应停止")
+	}
+	// 弹幕安静超过停止延迟后应停止
+	if !d.Tick(now.Add(19 * time.Second)) {
+		t.Fatal("弹幕停止超过停止延迟应返回停止")
+	}
+	// 会话已停止，后续 ASR 命中可重新触发
+	triggered, _ := d.Feed("星瞳", now.Add(25*time.Second))
+	if !triggered {
+		t.Fatal("停止后 ASR 命中应可再次触发")
+	}
+}
+
 func TestReset(t *testing.T) {
 	d := New(testOptions())
 	d.Feed("星瞳", time.Now())
