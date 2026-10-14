@@ -18,7 +18,7 @@
 
 ## 🚀 快速开始
 
-环境要求：Go 1.21+、[ffmpeg](https://ffmpeg.org/)（加入 PATH）。
+环境要求：Go 1.25+、[ffmpeg](https://ffmpeg.org/)（加入 PATH）。
 
 ```bash
 git clone https://github.com/Maicarons/hymREC.git
