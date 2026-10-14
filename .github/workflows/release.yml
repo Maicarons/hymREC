@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '补发 Release 用的既有 tag（形如 v0.1）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: Go test
+        run: go test ./...
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-amd64
+            goos: linux
+            goarch: amd64
+            ext: ''
+          - name: linux-arm64
+            goos: linux
+            goarch: arm64
+            ext: ''
+          - name: darwin-amd64
+            goos: darwin
+            goarch: amd64
+            ext: ''
+          - name: darwin-arm64
+            goos: darwin
+            goarch: arm64
+            ext: ''
+          - name: windows-amd64
+            goos: windows
+            goarch: amd64
+            ext: '.exe'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+          VERSION: ${{ inputs.tag || github.ref_name }}
+        run: |
+          mkdir -p dist
+          go build -trimpath \
+            -ldflags "-s -w -X main.version=${VERSION}" \
+            -o "dist/hymREC_${VERSION}_${{ matrix.name }}${{ matrix.ext }}" \
+            ./cmd/hymREC
+
+      - name: Smoke test
+        if: matrix.name == 'linux-amd64'
+        run: ./dist/hymREC_${VERSION}_linux-amd64 -h || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hymREC-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: List artifacts
+        run: ls -lh dist/*/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          cat > release-notes.md <<EOF
+          ## hymREC ${TAG}
+
+          面向虚拟主播直播切片场景的 B 站直播关键词触发录制系统：命中关键词或弹幕密度达标时，自动产出含前 90 秒上下文的视频切片。
+
+          ### 二进制
+
+          文件名格式：\`hymREC_<版本>_<平台>_<架构>[.exe]\`，均为 \`CGO_ENABLED=0\` 静态构建。
+
+          | 平台 | 文件 |
+          | --- | --- |
+          | Linux x86_64 | \`hymREC_${TAG}_linux-amd64\` |
+          | Linux ARM64 | \`hymREC_${TAG}_linux-arm64\` |
+          | macOS Intel | \`hymREC_${TAG}_darwin-amd64\` |
+          | macOS Apple Silicon | \`hymREC_${TAG}_darwin-arm64\` |
+          | Windows x86_64 | \`hymREC_${TAG}_windows-amd64.exe\` |
+
+          ### 运行前置条件
+
+          需自行安装 ffmpeg 并加入 PATH：
+
+          - Windows：\`winget install Gyan.FFmpeg\`
+          - macOS：\`brew install ffmpeg\`
+          - Linux：\`sudo apt install ffmpeg\`
+
+          可选安装 [FunASR](https://github.com/modelscope/FunASR) 流式服务以启用语音触发，否则仅用弹幕触发。
+
+          ### 使用
+
+          \`\`\`bash
+          cp config.example.yaml config.yaml   # 修改 room_id
+          ./hymREC_${TAG}_<平台>_<架构> -c config.yaml
+          \`\`\`
+
+          文档：https://maicarons.github.io/hymREC/
+          EOF
+          gh release create "${TAG}" dist/*/* \
+            --title "hymREC ${TAG}" \
+            --notes-file release-notes.md \
+            --generate-notes

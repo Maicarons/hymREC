@@ -29,16 +29,41 @@ npm run build     # 输出 docs/.vitepress/dist
 
 ## CI
 
-GitHub Actions（`.github/workflows/ci.yml`）：
+GitHub Actions：
 
-- **test**：`go vet` + `go test ./...`（含 race）+ VitePress 文档构建；
-- 需要 ffmpeg 的端到端测试在 CI 中自动跳过（无 ffmpeg 环境）或按需启用。
+- **`ci.yml`**（push / PR 到 `main`）：`go vet` + `go test -race ./...` + `go build`，以及 VitePress 文档构建；环境预装 ffmpeg，端到端测试可实际运行；
+- **`pages.yml`**（push 到 `main`）：构建文档并部署到 GitHub Pages（`https://maicarons.github.io/hymREC/`）；
+- **`release.yml`**（推送 `v*` tag，或手动指定 tag）：先 `go vet` + `go test`，再交叉编译五个平台二进制并创建 GitHub Release。
 
 ## 发布流程
 
-1. 更新 `version` 并打 tag：`git tag v1.0.0 && git push --tags`；
-2. GitHub Actions 自动构建三平台二进制并附加到 Release；
-3. 同步更新文档（docs 目录随主仓库发布）。
+1. 打 tag 并推送，Release workflow 随即触发：
+
+   ```bash
+   git tag v0.1
+   git push origin v0.1
+   ```
+
+2. 交叉编译产物（文件名含项目名与版本号，7.4 MB 左右）：
+
+   | 平台 | 文件名 |
+   | --- | --- |
+   | Linux x86_64 | `hymREC_v0.1_linux-amd64` |
+   | Linux ARM64 | `hymREC_v0.1_linux-arm64` |
+   | macOS Intel | `hymREC_v0.1_darwin-amd64` |
+   | macOS Apple Silicon | `hymREC_v0.1_darwin-arm64` |
+   | Windows x86_64 | `hymREC_v0.1_windows-amd64.exe` |
+
+   均为 `CGO_ENABLED=0` 静态构建，运行前需自行安装 ffmpeg。
+
+3. 本地复现与验证版本号：
+
+   ```bash
+   make build-windows VERSION=v0.1
+   ./bin/hymREC.exe -version        # 输出 hymREC v0.1
+   ```
+
+4. 文档随 `main` 自动部署，无需手动发布。
 
 ## Docker（可选）
 

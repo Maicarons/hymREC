@@ -29,6 +29,8 @@ cp config.example.yaml config.yaml   # 修改 room_id
 ./bin/hymREC -c config.yaml
 ```
 
+不想编译？直接从 [Releases](https://github.com/Maicarons/hymREC/releases) 下载预编译二进制 `hymREC_<版本>_<平台>_<架构>`（Windows 带 `.exe`），跳过构建步骤。运行前需自行安装 [ffmpeg](https://ffmpeg.org/) 并加入 PATH。
+
 输出：
 
 ```
