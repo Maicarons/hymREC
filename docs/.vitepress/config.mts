@@ -4,6 +4,8 @@ export default defineConfig({
   title: 'hymREC',
   description: '面向虚拟主播直播切片的关键词触发录制系统',
   lang: 'zh-CN',
+  // 文档站部署于 GitHub Pages 项目站点：https://maicarons.github.io/hymREC/
+  base: '/hymREC/',
   cleanUrls: true,
   lastUpdated: true,
   head: [
@@ -14,7 +16,7 @@ export default defineConfig({
     nav: [
       { text: '首页', link: '/' },
       { text: '指南', link: '/guide/quickstart' },
-      { text: 'GitHub', link: 'https://github.com/henyemiren/hymREC' },
+      { text: 'GitHub', link: 'https://github.com/Maicarons/hymREC' },
     ],
     sidebar: [
       {
@@ -46,10 +48,10 @@ export default defineConfig({
       copyright: 'Copyright © 2026 hymREC contributors',
     },
     editLink: {
-      pattern: 'https://github.com/henyemiren/hymREC/edit/main/docs/:path',
+      pattern: 'https://github.com/Maicarons/hymREC/edit/main/docs/:path',
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/henyemiren/hymREC' },
+      { icon: 'github', link: 'https://github.com/Maicarons/hymREC' },
     ],
   },
 })

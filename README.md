@@ -6,7 +6,7 @@
 
 关键词策略参考**一些切片创作者**的"量大管饱也有爆点"风格：触发条件宽松、覆盖"其他主播提及相关话题"的外溢内容。
 
-> ⚠️ 仅供学习交流使用。请在征得对方许可的情况下录制，请勿用于商业用途或大规模录制。详见 [法律声明](https://henyemiren.github.io/hymREC/guide/legal.html)。
+> ⚠️ 仅供学习交流使用。请在征得对方许可的情况下录制，请勿用于商业用途或大规模录制。详见 [法律声明](https://Maicarons.github.io/hymREC/guide/legal.html)。
 
 ## ✨ 特性
 
@@ -21,7 +21,7 @@
 环境要求：Go 1.21+、[ffmpeg](https://ffmpeg.org/)（加入 PATH）。
 
 ```bash
-git clone https://github.com/henyemiren/hymREC.git
+git clone https://github.com/Maicarons/hymREC.git
 cd hymREC
 
 make build

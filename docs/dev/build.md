@@ -23,7 +23,7 @@ go build -ldflags "-X main.version=v1.0.0" -o bin/hymREC ./cmd/hymREC
 ```bash
 cd docs
 npm install
-npm run dev       # 本地预览 http://localhost:5173
+npm run dev       # 本地预览 http://localhost:5173/hymREC/
 npm run build     # 输出 docs/.vitepress/dist
 ```
 

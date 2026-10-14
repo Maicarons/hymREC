@@ -13,8 +13,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/henyemiren/hymREC/internal/config"
-	"github.com/henyemiren/hymREC/internal/pipeline"
+	"github.com/Maicarons/hymREC/internal/config"
+	"github.com/Maicarons/hymREC/internal/pipeline"
 )
 
 var version = "dev"

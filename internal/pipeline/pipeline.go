@@ -14,14 +14,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/henyemiren/hymREC/internal/asr"
-	"github.com/henyemiren/hymREC/internal/bili"
-	"github.com/henyemiren/hymREC/internal/capture"
-	"github.com/henyemiren/hymREC/internal/config"
-	"github.com/henyemiren/hymREC/internal/danmaku"
-	"github.com/henyemiren/hymREC/internal/keyword"
-	"github.com/henyemiren/hymREC/internal/recorder"
-	"github.com/henyemiren/hymREC/internal/ringbuf"
+	"github.com/Maicarons/hymREC/internal/asr"
+	"github.com/Maicarons/hymREC/internal/bili"
+	"github.com/Maicarons/hymREC/internal/capture"
+	"github.com/Maicarons/hymREC/internal/config"
+	"github.com/Maicarons/hymREC/internal/danmaku"
+	"github.com/Maicarons/hymREC/internal/keyword"
+	"github.com/Maicarons/hymREC/internal/recorder"
+	"github.com/Maicarons/hymREC/internal/ringbuf"
 )
 
 // Pipeline 主流水线。

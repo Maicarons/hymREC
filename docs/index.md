@@ -10,7 +10,7 @@ hero:
       link: /guide/quickstart
     - theme: alt
       text: GitHub
-      link: https://github.com/henyemiren/hymREC
+      link: https://github.com/Maicarons/hymREC
 
 features:
   - icon: 🎯

@@ -5,7 +5,7 @@ package asr
 import (
 	"fmt"
 
-	"github.com/henyemiren/hymREC/internal/config"
+	"github.com/Maicarons/hymREC/internal/config"
 )
 
 // Engine 流式语音识别引擎接口。

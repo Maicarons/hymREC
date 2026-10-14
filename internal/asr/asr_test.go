@@ -11,7 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/henyemiren/hymREC/internal/config"
+	"github.com/Maicarons/hymREC/internal/config"
 )
 
 func TestNoneEngine(t *testing.T) {

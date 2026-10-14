@@ -9,7 +9,7 @@
 ## 1. 克隆与构建
 
 ```bash
-git clone https://github.com/henyemiren/hymREC.git
+git clone https://github.com/Maicarons/hymREC.git
 cd hymREC
 
 # 构建
@@ -27,7 +27,7 @@ cp config.example.yaml config.yaml
 编辑 `config.yaml`，至少修改：
 
 ```yaml
-room_id: 21452505        # 目标直播间号（支持短号）
+room_id: 82568        # 目标直播间号（支持短号）
 asr:
   type: funasr-ws        # none（仅弹幕）| funasr-ws（真实 FunASR）
 ```
