@@ -96,6 +96,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # gh 需要仓库上下文才能定位仓库；--repo 显式指定作为兜底
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -107,6 +112,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
           cat > release-notes.md <<EOF
           ## hymREC ${TAG}
@@ -145,6 +151,7 @@ jobs:
           文档：https://maicarons.github.io/hymREC/
           EOF
           gh release create "${TAG}" dist/*/* \
+            --repo "${REPO}" \
             --title "hymREC ${TAG}" \
             --notes-file release-notes.md \
             --generate-notes
