@@ -2,7 +2,7 @@ BIN := bin/hymREC
 VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build test test-race vet coverage run clean docs docs-dev fmt
+.PHONY: all build build-linux build-darwin build-windows vet test test-race coverage run clean fmt fmt-check docs docs-dev docs-build
 
 all: vet build
 
@@ -34,11 +34,21 @@ coverage:
 run: build
 	$(BIN) -c config.yaml
 
+# 构建文档静态站点（docs-dev 启动本地预览）
+docs: docs-build
+
+docs-build:
+	cd docs && npm ci && npm run build
+
 docs-dev:
 	cd docs && npm run dev
 
-docs-build:
-	cd docs && npm install && npm run build
-
 fmt:
 	gofmt -w cmd internal
+
+fmt-check:
+	@out="$$(gofmt -l cmd internal)"; \
+	if [ -n "$$out" ]; then echo "以下文件未格式化，请执行 make fmt："; echo "$$out"; exit 1; fi
+
+clean:
+	rm -rf bin coverage.out coverage.html docs/.vitepress/dist

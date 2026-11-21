@@ -14,7 +14,8 @@
 - **视频回溯切片**：ffmpeg 按 10 秒分段持续缓冲，触发时回溯前 90 秒并 concat 合并输出 TS/MP4
 - **弹幕辅助触发**：WebSocket 实时监听弹幕密度（30 秒窗口 ≥ 5 条触发，延迟确认防误触）
 - **流式 ASR**：内置 FunASR WebSocket 客户端与热词注入，识别命中关键词即触发
-- **断线自愈**：视频缓冲与音频采集自动重连；弹幕指数退避重连
+- **断流自愈**：音频采集自动重建，视频缓冲看门狗检测卡死后刷新流地址重启；主播下播后自动回到等待开播
+- **内置监控面板**：单二进制自带网页控制台，实时状态、事件流、切片下载、日志与在线设置
 
 ## 🚀 快速开始
 
@@ -38,6 +39,20 @@ recordings/    ← 触发录制产出的视频切片（.ts / .mp4）
 video_buffer/  ← 持续分段缓冲（自动清理）
 ```
 
+启动后打开 <http://127.0.0.1:8080> 即可看到监控面板；不需要面板时加 `-no-web`，换端口用 `-web-addr 127.0.0.1:9000`。
+
+## 🖥️ 监控面板
+
+面板资源编进二进制（`go:embed`），无需 Node 或额外部署。
+
+- **状态**：直播间与开播状态、运行/会话时长、视频缓冲分段与卡死检测、录制中/触发来源、ASR 最后识别文本、弹幕连接与窗口命中数、切片数量与总大小；
+- **事件流**：会话开始/结束、触发、切片产出、流地址刷新、缓冲重启、错误，SSE 实时推送；
+- **切片**：按触发时间倒序，显示来源/大小，点击下载；
+- **日志**：与终端一致的结构化日志，可级别过滤、跟随滚动；
+- **控制**：启动/停止、手动切片、结束录制、应用并重启（切换直播间）、在线调整关键词 T1-T4 与触发节奏、弹幕密度参数。
+
+所有能力都有 HTTP 接口，可脚本化；详见[监控面板文档](docs/guide/dashboard.md)。
+
 ## 🏗️ 架构
 
 ```
@@ -55,7 +70,12 @@ make test        # 单元 + 集成测试
 make test-race   # 含竞态检测
 ```
 
-端到端集成测试（`TestPipelineEndToEnd`）使用 ffmpeg 实时生成测试流，验证"触发 → 回溯 → 合并 → 切片输出"全链路；无 ffmpeg 时自动跳过。
+- **`TestPipelineEndToEnd`**（默认运行）：ffmpeg 用 lavfi 实时合成 HLS 直播流，配合模拟 B 站 API 与脚本化 ASR，验证"触发 → 回溯 → 合并 → 切片输出"全链路，并校验下播后会话正确结束；无 ffmpeg/ffprobe 时自动跳过。
+- **`TestRealLiveEndToEnd`**（`-tags reallive`）：真实直播间 + 真实 FunASR 服务 + 真实弹幕服务器，需要目标主播正在直播。
+
+```bash
+go test -tags reallive -run TestRealLiveEndToEnd ./internal/pipeline/
+```
 
 ## 📚 文档
 
@@ -77,6 +97,7 @@ cd docs && npm install && npm run dev   # http://localhost:5173
 ```
 cmd/hymREC          主入口
 internal/
+  app/              服务生命周期、切片索引、事件广播
   asr/              ASR 引擎（none / FunASR-WS）
   bili/             B 站直播 API
   capture/          音频采集（ffmpeg 管道）
@@ -86,6 +107,7 @@ internal/
   pipeline/         主流水线
   recorder/         视频分段缓冲 + 录制控制器
   ringbuf/          音频环形缓冲
+  web/              监控面板（HTTP API + SSE + 内嵌前端）
 docs/               VitePress 文档
 ```
 

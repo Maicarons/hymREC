@@ -81,6 +81,18 @@ type Detector struct {
 
 // New 创建检测器。
 func New(opts Options) *Detector {
+	return &Detector{opts: normalizeOptions(opts)}
+}
+
+// Update 在线替换规则与时长，保留当前滑动窗口与激活状态。
+func (d *Detector) Update(opts Options) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.opts = normalizeOptions(opts)
+}
+
+// normalizeOptions 补齐非法或缺失的参数。
+func normalizeOptions(opts Options) Options {
 	if opts.MaxBuffer <= 0 {
 		opts.MaxBuffer = 40
 	}
@@ -96,7 +108,7 @@ func New(opts Options) *Detector {
 	if opts.T3CooccurWindow <= 0 {
 		opts.T3CooccurWindow = 30 * time.Second
 	}
-	return &Detector{opts: opts}
+	return opts
 }
 
 // Feed 输入一段增量识别文本，返回 (是否触发录制, 是否应停止录制)。

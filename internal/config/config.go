@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Default 返回一份带默认值的配置，默认值对齐 plan.md 第八节参数。
+// Default 返回一份带默认值的配置；未在 YAML 中出现的字段由 fillDefaults 补齐。
 func Default() *Config {
 	return &Config{
 		RoomID:            21452505,
@@ -66,6 +66,11 @@ func Default() *Config {
 			FFmpegPath:          "ffmpeg",
 		},
 
+		Web: WebConfig{
+			Enabled: true,
+			Listen:  "127.0.0.1:8080",
+		},
+
 		LogLevel: "info",
 	}
 }
@@ -95,6 +100,7 @@ type Config struct {
 	Keyword  KeywordConfig  `yaml:"keyword"`
 	Danmaku  DanmakuConfig  `yaml:"danmaku"`
 	Recorder RecorderConfig `yaml:"recorder"`
+	Web      WebConfig      `yaml:"web"`
 
 	// LogLevel 日志级别：debug | info | warn | error。
 	LogLevel string `yaml:"log_level"`
@@ -126,18 +132,18 @@ type VADConfig struct {
 // KeywordConfig 层级关键词配置（T1 精确 / T2 模糊 / T3 联合 / T4 否定）。
 type KeywordConfig struct {
 	// StopDelaySeconds 停止延迟：关键词停止出现 N 秒后结束录制。
-	StopDelaySeconds int `yaml:"stop_delay_seconds"`
+	StopDelaySeconds int `yaml:"stop_delay_seconds" json:"stop_delay_seconds"`
 	// CooldownSeconds 冷却时间：同一会话内两次触发的最小间隔。
-	CooldownSeconds int `yaml:"cooldown_seconds"`
+	CooldownSeconds int `yaml:"cooldown_seconds" json:"cooldown_seconds"`
 	// T2Threshold T2 模糊匹配阈值（0-1），越高越严格。
-	T2Threshold float64 `yaml:"t2_threshold"`
+	T2Threshold float64 `yaml:"t2_threshold" json:"t2_threshold"`
 	// T3CooccurWindow T3 梗词与 T1/T2 的联合触发时间窗口（秒）。
-	T3CooccurWindow float64 `yaml:"t3_cooccur_window"`
+	T3CooccurWindow float64 `yaml:"t3_cooccur_window" json:"t3_cooccur_window"`
 
-	T1 []string `yaml:"t1"`
-	T2 []string `yaml:"t2"`
-	T3 []string `yaml:"t3"`
-	T4 []string `yaml:"t4"`
+	T1 []string `yaml:"t1" json:"t1"`
+	T2 []string `yaml:"t2" json:"t2"`
+	T3 []string `yaml:"t3" json:"t3"`
+	T4 []string `yaml:"t4" json:"t4"`
 }
 
 // DanmakuConfig 弹幕辅助触发配置。
@@ -169,6 +175,14 @@ type RecorderConfig struct {
 	FilenamePrefix string `yaml:"filename_prefix"`
 	// FFmpegPath ffmpeg 可执行文件路径。
 	FFmpegPath string `yaml:"ffmpeg_path"`
+}
+
+// WebConfig 监控面板配置。
+type WebConfig struct {
+	// Enabled 是否启动网页控制台。
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// Listen 监听地址；默认只监听本机回环地址，需要远程访问时改为 0.0.0.0:8080。
+	Listen string `yaml:"listen" json:"listen"`
 }
 
 // Load 从文件读取配置；文件不存在时返回默认配置。
@@ -234,6 +248,9 @@ func (c *Config) fillDefaults() {
 	if len(c.ASR.ChunkSize) != 3 {
 		c.ASR.ChunkSize = d.ASR.ChunkSize
 	}
+	if c.VAD.EnergyThreshold <= 0 {
+		c.VAD.EnergyThreshold = d.VAD.EnergyThreshold
+	}
 	if c.Keyword.StopDelaySeconds == 0 {
 		c.Keyword.StopDelaySeconds = d.Keyword.StopDelaySeconds
 	}
@@ -291,6 +308,9 @@ func (c *Config) fillDefaults() {
 	if c.Recorder.FFmpegPath == "" {
 		c.Recorder.FFmpegPath = d.Recorder.FFmpegPath
 	}
+	if c.Web.Listen == "" {
+		c.Web.Listen = d.Web.Listen
+	}
 	if c.LogLevel == "" {
 		c.LogLevel = d.LogLevel
 	}
@@ -307,6 +327,15 @@ func (c *Config) Validate() error {
 	if c.Platform != "web" && c.Platform != "h5" {
 		return fmt.Errorf("platform 仅支持 web(flv) 或 h5(m3u8)，当前: %q", c.Platform)
 	}
+	if c.SampleRate <= 0 {
+		return fmt.Errorf("sample_rate 必须为正整数")
+	}
+	if c.ChunkMS <= 0 {
+		return fmt.Errorf("chunk_ms 必须为正整数")
+	}
+	if c.RingBufferSeconds <= 0 {
+		return fmt.Errorf("ring_buffer_seconds 必须为正整数")
+	}
 	switch c.ASR.Type {
 	case "none", "funasr-ws":
 	default:
@@ -317,6 +346,26 @@ func (c *Config) Validate() error {
 	}
 	if c.Recorder.MergeFormat != "ts" && c.Recorder.MergeFormat != "mp4" {
 		return fmt.Errorf("recorder.merge_format 仅支持 ts|mp4，当前: %q", c.Recorder.MergeFormat)
+	}
+	if c.Recorder.VideoSegmentSeconds <= 0 {
+		return fmt.Errorf("recorder.video_segment_seconds 必须为正整数")
+	}
+	// 视频缓冲保留时长必须覆盖回溯窗口与一个完整分段，否则切片开头会缺内容
+	need := time.Duration(c.RingBufferSeconds+c.Recorder.VideoSegmentSeconds) * time.Second
+	if keep := time.Duration(c.Recorder.VideoKeepMinutes) * time.Minute; keep < need {
+		return fmt.Errorf("recorder.video_keep_minutes（%d 分钟）不足以覆盖 ring_buffer_seconds(%d 秒) + video_segment_seconds(%d 秒)，至少需要 %d 分钟",
+			c.Recorder.VideoKeepMinutes, c.RingBufferSeconds, c.Recorder.VideoSegmentSeconds, int((need+time.Minute-1)/time.Minute))
+	}
+	if c.Danmaku.Enabled {
+		if c.Danmaku.WindowSeconds <= 0 {
+			return fmt.Errorf("danmaku.window_seconds 必须为正整数")
+		}
+		if c.Danmaku.DensityThreshold <= 0 {
+			return fmt.Errorf("danmaku.density_threshold 必须为正整数")
+		}
+		if len(c.Danmaku.Keywords) == 0 {
+			return fmt.Errorf("danmaku.enabled 为 true 时 danmaku.keywords 不能为空")
+		}
 	}
 	return nil
 }

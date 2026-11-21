@@ -78,12 +78,26 @@ danmaku:
 recorder:
   output_dir: ./recordings            # 切片输出目录
   video_buffer_dir: ./video_buffer    # 视频分段缓冲目录
-  video_keep_minutes: 5               # 缓冲保留时长（分钟）
+  video_keep_minutes: 5               # 缓冲保留时长（分钟），须覆盖回溯窗口 + 一个分段
   video_segment_seconds: 10           # 每个 TS 分段时长（秒）
   merge_format: ts                    # 切片输出格式：ts（直接合并）| mp4（转封装）
   filename_prefix: hym_clip
   ffmpeg_path: ffmpeg                 # ffmpeg 可执行文件路径
 ```
+
+启动时会校验配置：`video_keep_minutes` 必须不小于 `ring_buffer_seconds + video_segment_seconds`，
+否则回溯窗口内的分段已被清理，切片会缺开头；`danmaku.enabled: true` 时 `danmaku.keywords` 不能为空。
+校验失败会直接退出并打印具体字段。
+
+## 监控面板
+
+```yaml
+web:
+  enabled: true               # 是否启动网页控制台
+  listen: 127.0.0.1:8080      # 默认只监听本机
+```
+
+命令行覆盖：`-web-addr 0.0.0.0:8080` 改监听地址，`-no-web` 关闭面板。面板能力见 [监控面板](./dashboard)。
 
 ## 日志
 

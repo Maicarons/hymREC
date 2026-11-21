@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>hymREC 控制台</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-name">hymREC</span>
+    <span class="brand-sub">关键词录制控制台</span>
+  </div>
+  <div class="topbar-mid">
+    <span class="conn" id="conn" data-state="off" title="实时连接">●</span>
+    <span class="pill" id="status-pill" data-state="stopped" role="status">连接中…</span>
+    <span class="muted small" id="version"></span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn--primary" id="btn-start">启动</button>
+    <button class="btn" id="btn-stop">停止</button>
+    <button class="btn" id="btn-trigger">手动切片</button>
+    <button class="btn" id="btn-endrec">结束录制</button>
+    <button class="btn btn--icon" id="btn-theme" title="切换主题">◐</button>
+    <button class="btn btn--ghost" id="btn-settings">设置</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="cards" id="cards">
+    <article class="card">
+      <div class="card-head"><span class="card-label">直播间</span><span class="tag" id="room-live">—</span></div>
+      <div class="card-value mono" id="room-id">—</div>
+      <div class="card-sub" id="room-title">未获取到直播信息</div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><span class="card-label">运行</span><span class="tag" id="run-tag">—</span></div>
+      <div class="card-value mono" id="run-duration">—</div>
+      <div class="card-sub" id="run-since">—</div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><span class="card-label">视频缓冲</span><span class="tag" id="buffer-tag">—</span></div>
+      <div class="card-value mono" id="buffer-segments">—</div>
+      <div class="card-sub" id="buffer-sub">—</div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><span class="card-label">录制</span><span class="tag" id="rec-tag">—</span></div>
+      <div class="card-value mono" id="rec-elapsed">—</div>
+      <div class="card-sub" id="rec-sub">—</div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><span class="card-label">语音识别</span><span class="tag" id="asr-tag">—</span></div>
+      <div class="card-value mono" id="asr-type">—</div>
+      <div class="card-sub" id="asr-text">暂无识别结果</div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><span class="card-label">弹幕</span><span class="tag" id="dm-tag">—</span></div>
+      <div class="card-value mono" id="dm-hits">—</div>
+      <div class="card-sub" id="dm-sub">—</div>
+    </article>
+
+    <article class="card">
+      <div class="card-head"><span class="card-label">切片</span><span class="tag" id="clips-tag">—</span></div>
+      <div class="card-value mono" id="clips-count">—</div>
+      <div class="card-sub" id="clips-sub">—</div>
+    </article>
+  </section>
+
+  <section class="panels">
+    <section class="panel panel--events">
+      <header class="panel-head">
+        <h2>事件</h2>
+        <div class="panel-tools">
+          <span class="muted small" id="events-count">0</span>
+          <button class="btn btn--mini" id="btn-clear-events">清空</button>
+        </div>
+      </header>
+      <ol class="events" id="events">
+        <li class="empty">暂无事件。触发、切片产出、会话开始/结束与自愈动作会显示在这里。</li>
+      </ol>
+    </section>
+
+    <section class="panel panel--clips">
+      <header class="panel-head">
+        <h2>切片</h2>
+        <div class="panel-tools">
+          <span class="muted small" id="clips-summary"></span>
+          <button class="btn btn--mini" id="btn-refresh-clips">刷新</button>
+        </div>
+      </header>
+      <div class="table-wrap">
+        <table class="clips">
+          <thead>
+            <tr><th>时间</th><th>来源</th><th class="num">大小</th><th>文件</th><th></th></tr>
+          </thead>
+          <tbody id="clips-body">
+            <tr><td colspan="5" class="empty">暂无切片</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+  <section class="panel panel--logs">
+    <header class="panel-head">
+      <h2>日志</h2>
+      <div class="panel-tools">
+        <select class="select" id="log-level" aria-label="日志级别过滤">
+          <option value="all">全部</option>
+          <option value="info">信息及以上</option>
+          <option value="warn">警告及以上</option>
+          <option value="error">仅错误</option>
+        </select>
+        <label class="check"><input type="checkbox" id="log-follow" checked> 跟随</label>
+        <button class="btn btn--mini" id="btn-clear-logs">清空</button>
+      </div>
+    </header>
+    <div class="logs" id="logs" role="log" aria-live="polite"></div>
+  </section>
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="设置">
+  <header class="drawer-head">
+    <h2>设置</h2>
+    <button class="btn btn--icon" id="btn-close-settings" title="关闭">✕</button>
+  </header>
+
+  <form id="settings-form" class="drawer-body">
+    <section class="field-group">
+      <h3>直播间</h3>
+      <label class="field">
+        <span>房间号</span>
+        <input class="input mono" id="f-room" type="number" min="1" inputmode="numeric" placeholder="支持短号">
+      </label>
+      <p class="hint">更换房间号后需点击下方「应用并重启」才会切换。</p>
+    </section>
+
+    <section class="field-group">
+      <h3>关键词层级</h3>
+      <label class="field">
+        <span>T1 精确触发 <em id="c-t1"></em></span>
+        <textarea class="input mono" id="f-t1" rows="3" placeholder="每行一个词"></textarea>
+      </label>
+      <label class="field">
+        <span>T2 模糊触发 <em id="c-t2"></em></span>
+        <textarea class="input mono" id="f-t2" rows="3"></textarea>
+      </label>
+      <label class="field">
+        <span>T3 梗词联合 <em id="c-t3"></em></span>
+        <textarea class="input mono" id="f-t3" rows="3"></textarea>
+      </label>
+      <label class="field">
+        <span>T4 否定屏蔽 <em id="c-t4"></em></span>
+        <textarea class="input mono" id="f-t4" rows="2"></textarea>
+      </label>
+    </section>
+
+    <section class="field-group">
+      <h3>触发节奏</h3>
+      <div class="field-row">
+        <label class="field">
+          <span>停止延迟（秒）</span>
+          <input class="input mono" id="f-stop-delay" type="number" min="1" step="1">
+        </label>
+        <label class="field">
+          <span>冷却（秒）</span>
+          <input class="input mono" id="f-cooldown" type="number" min="1" step="1">
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span>T2 阈值</span>
+          <input class="input mono" id="f-t2-threshold" type="number" min="0.05" max="1" step="0.05">
+        </label>
+        <label class="field">
+          <span>T3 联合窗口（秒）</span>
+          <input class="input mono" id="f-t3-window" type="number" min="1" step="1">
+        </label>
+      </div>
+    </section>
+
+    <section class="field-group">
+      <h3>弹幕辅助</h3>
+      <label class="field">
+        <span>关键词 <em id="c-dm"></em></span>
+        <textarea class="input mono" id="f-dm-keywords" rows="2"></textarea>
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>密度阈值（条）</span>
+          <input class="input mono" id="f-dm-threshold" type="number" min="1" step="1">
+        </label>
+        <label class="field">
+          <span>统计窗口（秒）</span>
+          <input class="input mono" id="f-dm-window" type="number" min="1" step="1">
+        </label>
+      </div>
+      <p class="hint">弹幕开关与确认延迟需要重启服务才能修改，这里只展示当前值。</p>
+    </section>
+
+    <footer class="drawer-foot">
+      <button type="button" class="btn btn--primary" id="btn-apply">应用（实时生效）</button>
+      <button type="button" class="btn" id="btn-restart">应用并重启</button>
+    </footer>
+    <p class="hint">改动只影响本次运行，不会写回 config.yaml。</p>
+  </form>
+</aside>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>

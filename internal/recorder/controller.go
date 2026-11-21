@@ -39,6 +39,13 @@ type ControllerConfig struct {
 	FFmpegPath string
 }
 
+// Snapshot 录制状态机的只读快照。
+type Snapshot struct {
+	State     State
+	TriggerAt time.Time
+	Source    string
+}
+
 // Session 一次触发录制的会话信息。
 type Session struct {
 	TriggerAt time.Time
@@ -89,6 +96,18 @@ func (c *Controller) State() State {
 	return c.state
 }
 
+// Snapshot 返回当前录制状态快照。
+func (c *Controller) Snapshot() Snapshot {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := Snapshot{State: c.state}
+	if c.session != nil {
+		s.TriggerAt = c.session.TriggerAt
+		s.Source = c.session.Source
+	}
+	return s
+}
+
 // OnTrigger 关键词命中（或弹幕密度达标）时调用。
 // source 用于日志标识触发来源。
 func (c *Controller) OnTrigger(at time.Time, source string) {
@@ -130,18 +149,6 @@ func (c *Controller) OnStop() *Session {
 	}
 	sess.Output = output
 	return sess
-}
-
-// Close 停止录制并回收缓冲。
-func (c *Controller) Close() {
-	c.mu.Lock()
-	wasRecording := c.state == StateRecording
-	c.state = StateIdle
-	c.session = nil
-	c.mu.Unlock()
-	if wasRecording {
-		c.OnStop()
-	}
 }
 
 // mergeSegments 将分段列表合并为最终切片文件（ts 或 mp4）。

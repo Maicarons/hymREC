@@ -7,9 +7,9 @@
 1. `pipeline` 通过 `getDanmuInfo`（wbi 签名 + buvid3 cookie）获取房间**专属弹幕服务器地址与认证 token**；
 2. `danmaku.Client` 通过 WebSocket 连接专属弹幕服务器（`wss://<host>:<wss_port>/sub`），携带 `key` 认证；
 3. 完成认证（`protover=2`，zlib 压缩）后持续接收弹幕，每 30 秒发送心跳；
-4. 每条 `DANMU_MSG` 弹幕文本与关键词列表比对；
-5. **滑动窗口统计**：最近 `window_seconds`（默认 30 秒）内含关键词弹幕条数达到 `density_threshold`（默认 5）时触发；
-6. **延迟确认**：达标后等待 `confirm_delay`（默认 2 秒）再次确认仍达标才触发，降低误触发。
+4. 每条 `DANMU_MSG` 弹幕文本与 `danmaku.keywords` 比对（大小写不敏感，空白关键词忽略）；
+5. **滑动窗口统计**：最近 `window_seconds`（默认 30 秒）内含关键词弹幕条数达到 `density_threshold`（默认 5）时标记达标；
+6. **延迟确认**：达标后等待 `confirm_delay`（默认 2 秒）再次复查窗口仍达标才触发，降低误触发；确认通过后窗口清零，避免同一波弹幕反复触发。
 
 > 说明：B 站公共弹幕服务器 `broadcastlv.chat.bilibili.com` 要求携带 token，无 token 连接会被立即断开（1006）。系统会自动走 `getDanmuInfo` 获取专属服务器与 token，无需手动配置。
 
@@ -24,7 +24,11 @@
 | ASR 关键词 | T1/T2 命中 | 立即触发 |
 | ASR 关键词 | T3 + T1/T2 联合 | 立即触发 |
 | 弹幕密度 | 窗口内 ≥ 阈值条 | 延迟确认后触发 |
-| 双重验证 | ASR 与弹幕同时命中 | 触发并标记高置信度素材 |
+| 录制中弹幕命中 | 命中 `danmaku.keywords` 的弹幕 | 刷新停止倒计时，延长当前切片 |
+
+弹幕与 ASR 都只是同一状态机的触发源：录制中再次命中不会开启新会话，只会刷新停止倒计时；主播下播导致会话结束时，也会顺带把未完成的录制合并成切片。
+
+`danmaku.keywords` 只用于弹幕密度统计，与 `keyword.t1/t2/t3` 相互独立：需要弹幕与语音两条链路都覆盖同一组词时，两处都要配置。
 
 ## 配置
 

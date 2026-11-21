@@ -33,7 +33,10 @@ features:
     details: 内置 FunASR WebSocket 客户端与分级热词注入，识别命中关键词即触发录制
   - icon: 🔁
     title: 断线自愈
-    details: 视频缓冲与音频采集自动重连，流变化时重建采集器，弹幕指数退避重连
+    details: 音频采集自动重建；视频缓冲看门狗检测卡死后刷新流地址重启；下播后回到等待开播
+  - icon: 🖥️
+    title: 内置监控面板
+    details: 单二进制自带网页控制台，实时状态/事件/切片/日志，可启停、手动切片、在线调关键词
   - icon: ⏱️
     title: 触发即续期
     details: 录制期间再次命中即刷新停止倒计时，静默超过停止延迟才自动切片收尾
@@ -41,7 +44,7 @@ features:
 
 ## 快速开始
 
-环境要求：Go 1.21+、[ffmpeg](https://ffmpeg.org/)（加入 PATH）。
+环境要求：Go 1.25+、[ffmpeg](https://ffmpeg.org/)（加入 PATH）。
 
 ```bash
 git clone https://github.com/Maicarons/hymREC.git

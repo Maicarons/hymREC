@@ -24,6 +24,7 @@ export default defineConfig({
         items: [
           { text: '简介', link: '/guide/intro' },
           { text: '快速开始', link: '/guide/quickstart' },
+          { text: '监控面板', link: '/guide/dashboard' },
           { text: '系统架构', link: '/guide/architecture' },
           { text: '关键词策略', link: '/guide/keywords' },
           { text: '配置说明', link: '/guide/configuration' },
