@@ -3,11 +3,11 @@
 // 真实直播端到端测试：连接真实 B 站直播间、真实弹幕服务器与真实 FunASR 服务，
 // 验证"真实内容 -> 识别/弹幕触发 -> 回溯 -> 切片输出"全链路。
 //
-// 关键词使用 plan.md 的层级关键词（星瞳系列），因此目标直播间应为
-// 星瞳本人（22886883）或相关主播的直播间，需正在直播才能触发。
+// 关键词使用配置默认值（T1 精确 / T2 模糊 / T3 联合 / T4 否定），因此目标
+// 直播间应为这些关键词相关的主播，且需正在直播才能触发。
 //
 // 运行要求（缺一不可，缺失时测试明确报错）：
-//   - 目标直播间正在直播（可用 HYMREC_TEST_ROOM 指定，默认 22886883 星瞳_Official）
+//   - 目标直播间正在直播（可用 HYMREC_TEST_ROOM 指定，默认 22886883）
 //   - 本地 FunASR 流式服务可用（HYMREC_ASR_ENDPOINT，默认 ws://127.0.0.1:10095）
 //   - ffmpeg 可用
 //
@@ -34,7 +34,7 @@ func TestRealLiveEndToEnd(t *testing.T) {
 		t.Fatalf("需要 ffmpeg 才能录制，请先安装并加入 PATH")
 	}
 
-	roomID := envInt("HYMREC_TEST_ROOM", 22886883) // 星瞳_Official
+	roomID := envInt("HYMREC_TEST_ROOM", 22886883) // 与默认关键词相关的直播间
 	asrEndpoint := envStr("HYMREC_ASR_ENDPOINT", "ws://127.0.0.1:10095")
 
 	// 1. 校验直播间开播（真实 API）
@@ -44,36 +44,20 @@ func TestRealLiveEndToEnd(t *testing.T) {
 		t.Fatalf("查询直播间状态失败: %v", err)
 	}
 	if st.LiveStatus != 1 && st.LiveStatus != 2 {
-		t.Fatalf("房间 %d 当前未开播（live_status=%d）。plan.md 关键词为星瞳系列，需星瞳（22886883）或相关主播开播（含轮播）后才能触发录制", roomID, st.LiveStatus)
+		t.Fatalf("房间 %d 当前未开播（live_status=%d），需直播中（含轮播）才能触发录制", roomID, st.LiveStatus)
 	}
 	t.Logf("直播间: %d title=%q live_status=%d", roomID, st.Title, st.LiveStatus)
 
-	// 2. plan.md 的层级关键词（T1-T4）+ 快速节奏配置
+	// 2. 配置默认关键词 + 快速节奏（缩短停止延迟，便于在一次直播内验证切片产出）
 	cfg := config.Default()
 	cfg.RoomID = roomID
 	cfg.LiveCheckInterval = 10 * time.Second
 	cfg.ASR.Type = "funasr-ws"
 	cfg.ASR.Endpoint = asrEndpoint
-	cfg.ASR.Hotwords = map[string]int{
-		"星瞳": 5, "小星星": 5,
-		"瞳子": 4, "瞳宝": 4, "星瞳酱": 4,
-		"腾讯大小姐": 3, "CDD": 3, "虚无": 3,
-		"云之彼端": 3, "深月的风吟鸟唱": 3,
-		"邻家女孩": 3, "瞳工": 3,
-	}
 	cfg.VAD.Enabled = false // 关闭静音跳过，让 ASR 全程识别
 	cfg.Keyword.StopDelaySeconds = 20
 	cfg.Keyword.CooldownSeconds = 10
-	// plan.md 第四节关键词（T1 精确 / T2 模糊 / T3 联合 / T4 否定）
-	cfg.Keyword.T1 = []string{"星瞳", "XingTong", "XT"}
-	cfg.Keyword.T2 = []string{"小星星", "瞳子", "瞳宝", "星瞳酱"}
-	cfg.Keyword.T3 = []string{"腾讯大小姐", "CDD", "虚无", "云之彼端", "深月的风吟鸟唱", "邻家女孩", "瞳工"}
-	cfg.Keyword.T4 = []string{"不是星瞳", "星瞳的黑称"}
-	// 弹幕：plan.md 第五节关键词
 	cfg.Danmaku.Enabled = true
-	cfg.Danmaku.Keywords = []string{"星瞳", "瞳", "XT", "小星星"}
-	cfg.Danmaku.DensityThreshold = 5
-	cfg.Danmaku.WindowSeconds = 30
 	cfg.Danmaku.ConfirmDelay = 3 * time.Second
 	cfg.Recorder.OutputDir = filepath.Join(t.TempDir(), "recordings")
 	cfg.Recorder.VideoBufferDir = filepath.Join(t.TempDir(), "video_buffer")
@@ -111,7 +95,7 @@ func TestRealLiveEndToEnd(t *testing.T) {
 	}
 
 	if len(clips) == 0 {
-		t.Fatal("未产出任何切片：直播 3.5 分钟内 ASR 未命中 plan 关键词（星瞳系列），弹幕密度也未触发")
+		t.Fatal("未产出任何切片：直播 3.5 分钟内 ASR 未命中配置的关键词，弹幕密度也未触发")
 	}
 	info, err := os.Stat(clips[0])
 	if err != nil || info.Size() == 0 {

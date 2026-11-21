@@ -32,11 +32,16 @@ func newMockAPI(t *testing.T) *mockAPI {
 			"data": map[string]any{
 				"room_id":     21452505,
 				"short_id":    m.queryInt(r, "id"),
+				"uid":         434334701,
 				"live_status": status,
 			},
 		})
 	})
 	mux.HandleFunc("/room/v1/Room/getRoomInfoOld", func(w http.ResponseWriter, r *http.Request) {
+		// getRoomInfoOld 以主播 UID 查询，房间号与 UID 不同时用房间号查会拿不到标题
+		if mid := m.queryInt(r, "mid"); mid != 434334701 {
+			m.t.Errorf("getRoomInfoOld 的 mid = %d，期望主播 UID 434334701", mid)
+		}
 		status := 0
 		if m.live {
 			status = 1

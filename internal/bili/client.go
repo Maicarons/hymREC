@@ -146,8 +146,13 @@ func (c *Client) GetRoomStatus(roomID int) (*RoomStatus, error) {
 	if err := json.Unmarshal(r.Data, &st); err != nil {
 		return nil, fmt.Errorf("解析 room_init 响应失败: %w", err)
 	}
-	// 标题（尽力而为，失败不影响状态判断）
-	if r2, err := c.get(c.apiURL(apiRoomInfoOld), url.Values{"mid": {fmt.Sprint(roomID)}}); err == nil {
+	// 标题（尽力而为，失败不影响状态判断）。
+	// getRoomInfoOld 的 mid 是主播 UID，不是房间号；房间号与 UID 不同时必须用 UID 查。
+	mid := st.UID
+	if mid <= 0 {
+		mid = roomID
+	}
+	if r2, err := c.get(c.apiURL(apiRoomInfoOld), url.Values{"mid": {fmt.Sprint(mid)}}); err == nil {
 		var extra struct {
 			Title      string `json:"title"`
 			LiveStatus int    `json:"liveStatus"`

@@ -2,33 +2,31 @@
 //
 //	B站流 → 音频采集(ffmpeg) → VAD → 环形缓冲 → ASR → 关键词检测 → 录制控制器
 //	   └────────────── 弹幕监听(可选) ──→ 密度触发 ────────────────┘
+//
+// 运行期按「会话」组织：一次开播一个会话（拉流、缓冲、识别、触发），
+// 主播下播或断流无法恢复时结束会话并回到等待开播状态。会话内的
+// 自愈逻辑见 session.go。
 package pipeline
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"math"
+	"os"
+	"os/exec"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Maicarons/hymREC/internal/asr"
 	"github.com/Maicarons/hymREC/internal/bili"
-	"github.com/Maicarons/hymREC/internal/capture"
 	"github.com/Maicarons/hymREC/internal/config"
 	"github.com/Maicarons/hymREC/internal/danmaku"
 	"github.com/Maicarons/hymREC/internal/keyword"
 	"github.com/Maicarons/hymREC/internal/recorder"
 	"github.com/Maicarons/hymREC/internal/ringbuf"
 )
-
-// stopCheckInterval 停止判定的检查间隔。
-//
-// 停止判定不依赖 ASR 出字：主播长时间沉默（VAD 判静音或识别为空）时，
-// 若仅在 Feed 内部判定超时，录制将无法结束。
-const stopCheckInterval = 5 * time.Second
 
 // Pipeline 主流水线。
 type Pipeline struct {
@@ -45,8 +43,30 @@ type Pipeline struct {
 
 	dmDensity *densityCounter
 
-	roomID        int    // 真实房间号
-	lastStreamURL string // 最近一次获取的流地址
+	// sessionActive 标记当前是否处于直播会话中：弹幕触发只在会话内生效，
+	// 避免等待开播期间把录制状态机置为录制态（此时没有视频缓冲可回溯）。
+	sessionActive atomic.Bool
+
+	// statusMu 保护监控面板读取的状态字段。
+	statusMu     sync.RWMutex
+	roomTitle    string
+	liveStatus   int
+	sessionSince time.Time
+	streamSince  time.Time
+	lastASRText  string
+	lastASRAt    time.Time
+
+	// settingsMu 保护可在线调整的规则。
+	settingsMu sync.RWMutex
+	settings   Settings
+
+	emitMu  sync.Mutex
+	onEvent func(Event)
+
+	mu          sync.Mutex
+	roomID      int       // 真实房间号
+	streamURL   string    // 最近一次获取的流地址
+	lastRefresh time.Time // 最近一次刷新流地址的时刻
 }
 
 // New 创建流水线（不启动）。
@@ -108,7 +128,8 @@ func NewWithClient(cfg *config.Config, logger *slog.Logger, biliClient *bili.Cli
 		audioBuf:  audioBuf,
 		videoBuf:  videoBuf,
 		recorder:  ctrl,
-		dmDensity: newDensityCounter(cfg.Danmaku.WindowSeconds, cfg.Danmaku.DensityThreshold),
+		dmDensity: newDensityCounter(cfg.Danmaku.WindowSeconds, cfg.Danmaku.DensityThreshold, cfg.Danmaku.Keywords),
+		settings:  Settings{Keyword: cfg.Keyword, Danmaku: cfg.Danmaku},
 	}
 	if cfg.Danmaku.Enabled {
 		p.dmClient = danmaku.New(danmaku.Options{
@@ -119,52 +140,53 @@ func NewWithClient(cfg *config.Config, logger *slog.Logger, biliClient *bili.Cli
 	return p, nil
 }
 
-// RoomID 返回解析后的真实房间号（Run 前为 0）。
-func (p *Pipeline) RoomID() int { return p.roomID }
-
-// Run 运行流水线，直到 ctx 取消或出错。返回后所有资源已释放。
+// Run 运行流水线，直到 ctx 取消或出现无法恢复的错误。返回后所有子进程已停止。
 func (p *Pipeline) Run(ctx context.Context) error {
 	logger := p.logger
+	defer p.asrEngine.Close()
 
-	// 1. 等待开播
-	if err := p.waitForLive(ctx); err != nil {
-		return err
+	// ffmpeg 缺失属启动前置条件问题，直接报错而不是无限重试
+	if _, err := exec.LookPath(p.cfg.Recorder.FFmpegPath); err != nil {
+		return fmt.Errorf("启动 ffmpeg 失败（请确认已安装并加入 PATH）: %w", err)
 	}
 
-	// 2. 获取流地址
-	stream, err := p.bili.GetStreamURL(p.cfg.RoomID, p.cfg.Quality, p.cfg.Platform)
-	if err != nil {
-		return err
-	}
-	p.lastStreamURL = stream.URL
-	logger.Info("流地址获取成功", "url", stream.URL, "format", stream.Format)
-
-	// 3. 启动视频环形缓冲（TS 分段持续录制）
-	if err := p.videoBuf.Start(stream.URL); err != nil {
-		return err
-	}
-	defer p.videoBuf.Stop()
-
-	// 4. 启动弹幕监听（先获取房间专属弹幕服务器与 token）
-	if p.dmClient != nil {
+	dmStarted := false
+	startDanmaku := func() {
+		if dmStarted || p.dmClient == nil {
+			return
+		}
+		dmStarted = true
 		p.setupDanmaku(logger)
 		go func() {
 			if err := p.dmClient.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				logger.Warn("弹幕监听退出", "err", err)
 			}
 		}()
-		defer p.dmClient.Close()
 	}
+	defer func() {
+		if dmStarted {
+			p.dmClient.Close()
+		}
+	}()
 
-	// 5. 音频采集与识别主循环
-	logger.Info("系统启动",
-		"room_id", p.cfg.RoomID,
-		"stop_delay", p.cfg.Keyword.StopDelaySeconds,
-		"pre_roll", p.cfg.RingBufferSeconds,
-		"danmaku", p.cfg.Danmaku.Enabled,
-		"asr", p.cfg.ASR.Type,
-	)
-	return p.captureLoop(ctx)
+	for {
+		if err := p.waitForLive(ctx); err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+		startDanmaku()
+
+		if err := p.runSession(ctx); err != nil && ctx.Err() == nil {
+			logger.Warn("直播会话异常结束，稍后重新检测开播", "err", err)
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+		// 会话结束后稍作等待再查开播，避免断流时高频重建
+		p.sleepOrCancel(ctx, p.cfg.StreamRetryDelay)
+	}
 }
 
 // waitForLive 轮询等待主播开播。
@@ -180,10 +202,11 @@ func (p *Pipeline) waitForLive(ctx context.Context) error {
 			logger.Warn("查询开播状态失败", "err", err)
 		} else if st.LiveStatus == 1 || st.LiveStatus == 2 {
 			// 1=直播中，2=轮播（回放/投稿循环，同样有流可录）
-			p.roomID = st.RoomID
+			p.setRoomStatus(st.RoomID, st.Title, st.LiveStatus)
 			logger.Info("检测到直播流", "room_id", st.RoomID, "title", st.Title, "live_status", st.LiveStatus)
 			return nil
 		} else {
+			p.setRoomStatus(st.RoomID, st.Title, st.LiveStatus)
 			logger.Info("尚未开播，等待中", "room_id", p.cfg.RoomID, "interval", interval)
 		}
 		select {
@@ -194,110 +217,31 @@ func (p *Pipeline) waitForLive(ctx context.Context) error {
 	}
 }
 
-// captureLoop 主循环：采集音频 -> VAD -> 缓冲 -> ASR -> 关键词检测 -> 录制控制。
-func (p *Pipeline) captureLoop(ctx context.Context) error {
-	logger := p.logger
-	src, err := capture.New(capture.Options{
-		StreamURL:    p.streamURL(),
-		FFmpegPath:   p.cfg.Recorder.FFmpegPath,
-		SampleRate:   p.cfg.SampleRate,
-		ChunkSamples: p.cfg.ChunkSamples(),
-	})
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-	if err := src.Start(); err != nil {
-		return err
-	}
-
-	cleanupTicker := time.NewTicker(30 * time.Second)
-	defer cleanupTicker.Stop()
-
-	// 停止判定与 ASR 出字解耦：静音/空识别时也能按时收尾。
-	stopCheckTicker := time.NewTicker(stopCheckInterval)
-	defer stopCheckTicker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			p.finishRecording()
-			return nil
-		case <-cleanupTicker.C:
-			p.videoBuf.Cleanup()
-		case <-stopCheckTicker.C:
-			if p.detector.Tick(time.Now()) {
-				p.finishRecording()
-			}
-		default:
-		}
-
-		pcm, err := src.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-				logger.Warn("音频流中断，等待重连...")
-				p.sleepOrCancel(ctx, p.cfg.StreamRetryDelay)
-				continue
-			}
-			// ffmpeg 进程可能因流变化退出，重建
-			logger.Warn("读取音频失败，重建采集器", "err", err)
-			src.Close()
-			time.Sleep(p.cfg.StreamRetryDelay)
-			src, err = capture.New(capture.Options{
-				StreamURL:    p.streamURL(),
-				FFmpegPath:   p.cfg.Recorder.FFmpegPath,
-				SampleRate:   p.cfg.SampleRate,
-				ChunkSamples: p.cfg.ChunkSamples(),
-			})
-			if err != nil {
-				return err
-			}
-			if err := src.Start(); err != nil {
-				logger.Warn("重建采集器失败", "err", err)
-			}
-			continue
-		}
-
-		now := time.Now()
-		p.audioBuf.Write(pcm, now)
-
-		// VAD：静音跳过 ASR（省资源，避免无效关键词扫描）
-		if p.cfg.VAD.Enabled && isSilence(pcm, p.cfg.VAD.EnergyThreshold) {
-			continue
-		}
-
-		text, err := p.asrEngine.ProcessChunk(pcm)
-		if err != nil {
-			logger.Debug("ASR 调用失败", "err", err)
-			continue
-		}
-		if text == "" {
-			continue
-		}
-
-		triggered, shouldStop := p.detector.Feed(text, now)
-		if triggered {
-			p.recorder.OnTrigger(now, "asr")
-			logger.Info("[触发] ASR 关键词命中", "text", text)
-		}
-		if shouldStop {
-			p.finishRecording()
-		}
-	}
-}
-
 // finishRecording 结束当前录制会话并产出切片。
 func (p *Pipeline) finishRecording() {
 	sess := p.recorder.OnStop()
-	if sess != nil {
-		if sess.Output != "" {
-			p.logger.Info("[切片完成] 输出文件", "file", sess.Output,
-				"trigger_at", sess.TriggerAt.Format("15:04:05"),
-				"duration", sess.StopAt.Sub(sess.TriggerAt).Round(time.Second))
-		} else {
-			p.logger.Warn("[切片完成] 未找到可用的缓冲分段", "trigger_at", sess.TriggerAt.Format("15:04:05"))
-		}
+	if sess == nil {
+		return
 	}
+	if sess.Output != "" {
+		p.logger.Info("[切片完成] 输出文件", "file", sess.Output,
+			"trigger_at", sess.TriggerAt.Format("15:04:05"),
+			"duration", sess.StopAt.Sub(sess.TriggerAt).Round(time.Second))
+		var size int64
+		if info, err := os.Stat(sess.Output); err == nil {
+			size = info.Size()
+		}
+		p.emit(Event{
+			Type:    EventClip,
+			At:      time.Now(),
+			Source:  sess.Source,
+			File:    sess.Output,
+			Size:    size,
+			Message: "切片已产出",
+		})
+		return
+	}
+	p.logger.Warn("[切片完成] 未找到可用的缓冲分段", "trigger_at", sess.TriggerAt.Format("15:04:05"))
 }
 
 // setupDanmaku 获取弹幕服务器信息（token + 专属地址）并配置客户端。
@@ -306,7 +250,7 @@ func (p *Pipeline) setupDanmaku(logger *slog.Logger) {
 	if err := p.bili.EnsureBuvid3(); err != nil {
 		logger.Warn("获取 buvid3 失败（弹幕连接可能受影响）", "err", err)
 	}
-	info, err := p.bili.GetDanmuInfo(p.roomID)
+	info, err := p.bili.GetDanmuInfo(p.realRoomID())
 	if err != nil {
 		logger.Warn("获取弹幕服务器信息失败，使用公共服务器（可能连接失败）", "err", err)
 		return
@@ -319,6 +263,9 @@ func (p *Pipeline) setupDanmaku(logger *slog.Logger) {
 
 // onDanmakuMessage 弹幕回调：统计关键词密度。
 func (p *Pipeline) onDanmakuMessage(msg danmaku.Message) {
+	if !p.sessionActive.Load() {
+		return
+	}
 	text := msg.DanmakuText()
 	if text == "" {
 		return
@@ -335,26 +282,44 @@ func (p *Pipeline) onDanmakuMessage(msg danmaku.Message) {
 	if !dense {
 		return
 	}
-	// 弹幕密度达标：延迟确认后触发，避免误触发
-	delay := p.cfg.Danmaku.ConfirmDelay
+	// 弹幕密度达标：延迟确认后触发，避免误触发。
+	// 确认延迟与窗口参数都从当前设置快照读取：它们可被监控面板在线修改。
+	settings := p.CurrentSettings()
+	delay := settings.Danmaku.ConfirmDelay
 	if delay <= 0 {
 		delay = 2 * time.Second
 	}
-	go func() {
-		time.Sleep(delay)
-		if p.dmDensity.stillDense(now) && p.recorder.State() == recorder.StateIdle {
-			p.logger.Info("[触发] 弹幕密度达标", "window_seconds", p.cfg.Danmaku.WindowSeconds)
-			at := time.Now()
-			p.recorder.OnTrigger(at, "danmaku")
-			// 弹幕触发的会话同样纳入统一的停止延迟判定
-			p.detector.Touch(at)
+	time.AfterFunc(delay, func() {
+		if !p.sessionActive.Load() || !p.dmDensity.stillDense() {
+			return
 		}
-	}()
+		if p.recorder.State() != recorder.StateIdle {
+			return
+		}
+		at := time.Now()
+		p.logger.Info("[触发] 弹幕密度达标", "window_seconds", settings.Danmaku.WindowSeconds)
+		p.recorder.OnTrigger(at, "danmaku")
+		p.emit(Event{Type: EventTrigger, At: at, Source: "danmaku", Message: "弹幕密度达标"})
+		// 弹幕触发的会话同样纳入统一的停止延迟判定
+		p.detector.Touch(at)
+		p.dmDensity.consume()
+	})
 }
 
-// streamURL 返回最近一次获取的流地址（重连采集器时使用）。
-func (p *Pipeline) streamURL() string {
-	return p.lastStreamURL
+// currentStreamURL 返回最近一次获取的流地址。
+func (p *Pipeline) currentStreamURL() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.streamURL
+}
+
+func (p *Pipeline) setStreamURL(u string, refreshed bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.streamURL = u
+	if refreshed {
+		p.lastRefresh = time.Now()
+	}
 }
 
 func (p *Pipeline) sleepOrCancel(ctx context.Context, d time.Duration) {
@@ -365,108 +330,4 @@ func (p *Pipeline) sleepOrCancel(ctx context.Context, d time.Duration) {
 	case <-ctx.Done():
 	case <-time.After(d):
 	}
-}
-
-// densityCounter 弹幕关键词密度计数器（滑动窗口）。
-type densityCounter struct {
-	mu            sync.Mutex
-	windowSeconds int
-	threshold     int
-	keywords      []string
-	hits          []time.Time
-}
-
-func newDensityCounter(windowSeconds, threshold int) *densityCounter {
-	if windowSeconds <= 0 {
-		windowSeconds = 30
-	}
-	if threshold <= 0 {
-		threshold = 5
-	}
-	return &densityCounter{
-		windowSeconds: windowSeconds,
-		threshold:     threshold,
-		keywords:      []string{"星瞳", "瞳", "XT", "小星星"},
-	}
-}
-
-// countHit 计入一条弹幕，返回（是否命中关键词并计入窗口, 当前窗口是否达标）。
-// 达标后窗口计数清零，避免反复触发。
-func (d *densityCounter) countHit(text string, at time.Time) (counted, dense bool) {
-	if !d.matchKeyword(text) {
-		return false, false
-	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.hits = append(d.hits, at)
-	d.trimLocked(at)
-	if len(d.hits) >= d.threshold {
-		d.hits = nil
-		return true, true
-	}
-	return true, false
-}
-
-// matchKeyword 判断弹幕是否包含配置的关键词。
-func (d *densityCounter) matchKeyword(text string) bool {
-	for _, kw := range d.keywords {
-		if containsRune(text, kw) {
-			return true
-		}
-	}
-	return false
-}
-
-// stillDense 判断在基准时刻之后窗口内是否仍达标（延迟确认用）。
-func (d *densityCounter) stillDense(base time.Time) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.trimLocked(time.Now())
-	return len(d.hits) >= d.threshold
-}
-
-func (d *densityCounter) trimLocked(at time.Time) {
-	cutoff := at.Add(-time.Duration(d.windowSeconds) * time.Second)
-	kept := d.hits[:0]
-	for _, t := range d.hits {
-		if t.After(cutoff) {
-			kept = append(kept, t)
-		}
-	}
-	d.hits = kept
-}
-
-// containsRune 判断字符串是否包含目标子串。
-func containsRune(s, substr string) bool {
-	rs := []rune(s)
-	rt := []rune(substr)
-	if len(rt) == 0 || len(rs) < len(rt) {
-		return false
-	}
-	for i := 0; i <= len(rs)-len(rt); i++ {
-		ok := true
-		for j := range rt {
-			if rs[i+j] != rt[j] {
-				ok = false
-				break
-			}
-		}
-		if ok {
-			return true
-		}
-	}
-	return false
-}
-
-// isSilence 基于 RMS 能量判断静音。
-func isSilence(pcm []int16, threshold float64) bool {
-	if len(pcm) == 0 {
-		return true
-	}
-	var sum float64
-	for _, v := range pcm {
-		sum += float64(v) * float64(v)
-	}
-	rms := math.Sqrt(sum / float64(len(pcm)))
-	return rms < threshold
 }

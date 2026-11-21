@@ -21,6 +21,15 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
+      - name: Check gofmt
+        run: |
+          unformatted="$(gofmt -l cmd internal)"
+          if [ -n "$unformatted" ]; then
+            echo "以下文件未格式化（本地执行 make fmt 可修复）："
+            echo "$unformatted"
+            exit 1
+          fi
+
       - name: Go vet
         run: go vet ./...
 
@@ -42,7 +51,7 @@ jobs:
           node-version: '20'
 
       - name: Build VitePress docs
+        working-directory: docs
         run: |
-          cd docs
-          npm install
+          npm ci
           npm run build

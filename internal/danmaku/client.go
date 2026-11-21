@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -43,6 +44,8 @@ type Client struct {
 	closeCh   chan struct{}
 	mu        sync.Mutex
 	conn      *websocket.Conn
+	// connected 标记当前是否已完成认证并保持连接（监控面板使用）。
+	connected atomic.Bool
 }
 
 // New 创建弹幕客户端。onMsg 在每条弹幕/消息到达时被调用（运行于读循环 goroutine）。
@@ -69,6 +72,9 @@ func (c *Client) SetEndpoint(url, token string) {
 	}
 	c.opts.Token = token
 }
+
+// Connected 返回当前是否已连接并认证成功。
+func (c *Client) Connected() bool { return c.connected.Load() }
 
 // Run 连接弹幕服务器并持续监听，直到 ctx 取消或 Close 被调用。
 // 内部自动处理断线重连（退避等待）。
@@ -119,6 +125,7 @@ func (c *Client) runOnce(ctx context.Context) error {
 	c.conn = conn
 	c.mu.Unlock()
 	defer func() {
+		c.connected.Store(false)
 		c.mu.Lock()
 		c.conn = nil
 		c.mu.Unlock()
@@ -174,6 +181,7 @@ func (c *Client) handle(data []byte) error {
 				Code int `json:"code"`
 			}
 			if err := json.Unmarshal(p.Body, &authResp); err == nil && authResp.Code == 0 {
+				c.connected.Store(true)
 				c.opts.Logger.Info("弹幕认证成功", "room_id", c.opts.RoomID)
 			} else {
 				c.opts.Logger.Warn("弹幕认证异常", "code", authResp.Code)

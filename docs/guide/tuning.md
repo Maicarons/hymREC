@@ -7,7 +7,7 @@
 | `t2_threshold` | 0.75 | ↓ 提高召回率 | 越低越容易误触发 |
 | `t3_cooccur_window` | 30s | ↑ 扩大联合触发范围 | T3 词与 T1/T2 间隔多久仍可联合触发 |
 | `density_threshold` | 5 | ↓ 更敏感 | 30 秒内几条含关键词弹幕触发 |
-| `video_keep_minutes` | 5min | 根据磁盘容量调整 | 低码率 TS 约 2MB/分钟 |
+| `video_keep_minutes` | 5min | 根据磁盘容量调整（须 ≥ `ring_buffer_seconds` + `video_segment_seconds`） | 低码率 TS 约 2MB/分钟 |
 | `video_segment_seconds` | 10s | ↑ 减少分段数 | 段越长，回溯粒度越粗 |
 | `energy_threshold` | 500 | ↑ 更激进跳过静音 | ASR 资源有限时提高 |
 

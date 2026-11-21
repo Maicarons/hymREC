@@ -31,9 +31,10 @@ type VideoBufferConfig struct {
 type VideoBuffer struct {
 	cfg VideoBufferConfig
 
-	mu      sync.Mutex
-	cmd     *exec.Cmd
-	running bool
+	mu        sync.Mutex
+	cmd       *exec.Cmd
+	running   bool
+	startedAt time.Time
 }
 
 // NewVideoBuffer 创建视频缓冲。
@@ -95,6 +96,7 @@ func (v *VideoBuffer) Start(streamURL string) error {
 	}
 	v.cmd = cmd
 	v.running = true
+	v.startedAt = time.Now()
 	return nil
 }
 
@@ -103,6 +105,63 @@ func (v *VideoBuffer) Running() bool {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return v.running
+}
+
+// Stats 视频缓冲的只读快照。
+type Stats struct {
+	// Segments 当前保留的分段数。
+	Segments int
+	// Newest 最新分段的起始时刻（无分段时为零值）。
+	Newest time.Time
+	// Span 现存分段的覆盖时长（首段到末段）。
+	Span time.Duration
+	// Stalled 距最近一次分段产出（无分段时取启动时刻）的时长；未运行时为 0。
+	Stalled time.Duration
+}
+
+// Stats 返回缓冲状态快照。分段目录按需扫描（分段数很少，代价可忽略）。
+func (v *VideoBuffer) Stats() Stats {
+	v.mu.Lock()
+	running := v.running
+	startedAt := v.startedAt
+	dir := v.cfg.Dir
+	v.mu.Unlock()
+
+	var times []time.Time
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasPrefix(e.Name(), "seg_") || !strings.HasSuffix(e.Name(), ".ts") {
+				continue
+			}
+			if t := segmentTime(e.Name()); !t.IsZero() {
+				times = append(times, t)
+			}
+		}
+	}
+	sort.Slice(times, func(i, j int) bool { return times[i].Before(times[j]) })
+
+	st := Stats{Segments: len(times)}
+	if len(times) > 0 {
+		st.Newest = times[len(times)-1]
+		st.Span = st.Newest.Sub(times[0])
+	}
+	if running {
+		since := startedAt
+		if st.Newest.After(since) {
+			since = st.Newest
+		}
+		if !since.IsZero() {
+			st.Stalled = time.Since(since)
+		}
+	}
+	return st
+}
+
+// StallDuration 返回距最近一次分段产出的时长，未运行时为 0。
+// 直播流地址带有效期，过期后 ffmpeg 进程仍然存活但不再产出分段，
+// 调用方可据此判定缓冲卡死并重启。
+func (v *VideoBuffer) StallDuration() time.Duration {
+	return v.Stats().Stalled
 }
 
 // segmentTime 从文件名解析分段起始时间，解析失败返回 zero Time。
@@ -180,6 +239,7 @@ func (v *VideoBuffer) Stop() {
 		return
 	}
 	v.running = false
+	v.startedAt = time.Time{}
 	if v.cmd != nil && v.cmd.Process != nil {
 		_ = v.cmd.Process.Kill()
 		_, _ = v.cmd.Process.Wait()

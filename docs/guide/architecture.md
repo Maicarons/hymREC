@@ -32,18 +32,47 @@
 
 ## 流水线流程
 
-1. **开播检测**：`pipeline.waitForLive` 轮询 `getRoomInfoOld`，等待 `liveStatus == 1`；
-2. **流地址获取**：`bili.GetStreamURL` 通过 `room_init`（短号→真实号）与 `playUrl`（`platform=web` 返回 FLV）获取流地址；
-3. **视频缓冲**：`recorder.VideoBuffer` 用 ffmpeg 以 TS 分段持续录制直播流（默认 10 秒/段，保留 5 分钟），支持断线重连；
+1. **开播检测**：`pipeline.waitForLive` 轮询 `room_init`，等待 `live_status` 为 1（直播中）或 2（轮播）；
+2. **会话启动**：`pipeline.runSession` 经 `playUrl` 获取流地址（`platform=web` 返回 FLV，`h5` 返回 HLS），启动视频缓冲与音频采集；
+3. **视频缓冲**：`recorder.VideoBuffer` 用 ffmpeg 以 TS 分段持续录制直播流（默认 10 秒/段，保留 5 分钟）；
 4. **音频采集**：`capture.Source` 用 ffmpeg 抽取 16kHz 单声道 PCM，每 600ms 一块；
 5. **识别与检测**：VAD 静音检测 → `ringbuf` 写入（保留最近 90 秒）→ ASR 增量文本 → `keyword.Detector` 层级检测；
 6. **录制控制**：触发时 `recorder.Controller` 进入录制态；停止时从视频缓冲提取 `[触发时刻-90s, 停止时刻]` 的分段，用 ffmpeg concat 合并输出；
-7. **弹幕辅助**：`danmaku.Client` 实时监听，30 秒窗口内含关键词弹幕达到阈值时，延迟确认后触发录制。
+7. **弹幕辅助**：`danmaku.Client` 实时监听，窗口内命中 `danmaku.keywords` 的弹幕达到阈值时，延迟确认后触发录制。
+
+## 会话与自愈
+
+运行期按**会话**组织：一次开播对应一个会话，会话结束后主循环回到等待开播。这样长时间无人值守运行时，主播下播不会对着失效流空转。
+
+每个会话有一个看门狗（`pipeline.watchStream`，每 15 秒检查一次）：
+
+| 检查项 | 判定 | 动作 |
+|--------|------|------|
+| 开播状态 | `live_status == 0` | 结束会话：停止缓冲、合并未完成的录制、回到等待开播 |
+| 视频缓冲 | 超过 60 秒没有新分段 | 刷新流地址并重启视频缓冲 |
+| 音频采集 | 读取 PCM 失败（EOF/错误） | 刷新流地址（30 秒内复用缓存）后重建采集进程 |
+
+B 站直播流地址带有效期，过期后 ffmpeg 进程仍然存活但不再产出数据——看门狗检测的是"分段是否还在增长"，因此能覆盖这种情况；单纯依赖 ffmpeg 自身的 `-reconnect` 无法发现地址失效。
+
+音频采集器每次重建都持有新的进程句柄并立即回收旧进程，退出时关闭当前句柄，不会遗留 ffmpeg 子进程。
+
+## 监控面板层
+
+`internal/app` 把流水线的生命周期与可观测状态收拢成一个服务：
+
+- **生命周期**：启动/停止/重启（可切换直播间），停止时等待未完成的切片合并；
+- **状态快照**：房间、会话、缓冲、录制、ASR、弹幕与切片汇总，供 `/api/status` 与 SSE 推送；
+- **事件广播**：流水线事件（触发、切片、会话、自愈）通过 `eventHub` 分发给所有面板连接；
+- **在线设置**：关键词与弹幕密度参数热更新到检测器，不重建流水线。
+
+`internal/web` 暴露 HTTP API、SSE 与内嵌前端（`ui/` 由 `go:embed` 打包）。日志通过 `slog.Handler` 复制到环形缓冲，面板与终端看到的是同一份日志。细节见 [监控面板](./dashboard)。
 
 ## 并发模型
 
-- **主 goroutine**：`pipeline.Run` 中的采集-识别-检测循环；
+- **主 goroutine**：`pipeline.Run` 的会话循环与 `captureLoop` 采集-识别-检测循环；
+- **看门狗 goroutine**：每个会话一个，负责下播检测与缓冲重启；
 - **弹幕 goroutine**：`danmaku.Client.Run` 读循环（断线自动重连退避）；
+- **HTTP 服务**：监控面板的请求与 SSE 连接，读状态快照、写控制指令；
 - **ffmpeg 子进程**：视频分段录制与音频抽取各占一个独立进程；
 - 组件间通过 channel / 互斥锁通信，全部支持 `context` 取消。
 

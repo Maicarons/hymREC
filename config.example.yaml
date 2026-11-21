@@ -64,11 +64,16 @@ danmaku:
 recorder:
   output_dir: ./recordings
   video_buffer_dir: ./video_buffer
-  video_keep_minutes: 5        # 缓冲保留时长（分钟）
+  video_keep_minutes: 5        # 缓冲保留时长（分钟），须覆盖回溯窗口 + 一个分段
   video_segment_seconds: 10    # TS 分段时长（秒）
   merge_format: ts             # ts 直接合并；mp4 需 ffmpeg 转封装
   filename_prefix: hym_clip
   ffmpeg_path: ffmpeg
+
+# ============ 监控面板 ============
+web:
+  enabled: true                # 是否启动网页控制台
+  listen: 127.0.0.1:8080       # 默认只监听本机；需要远程访问改成 0.0.0.0:8080
 
 # ============ 日志 ============
 log_level: info                # debug | info | warn | error
